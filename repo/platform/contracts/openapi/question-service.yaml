@@ -1,0 +1,52 @@
+openapi: 3.0.3
+info:
+  title: OneLink question-service (draft skeleton)
+  version: 0.1.0-draft
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/v1/questions/answers:
+    post:
+      summary: placeholder
+      responses:
+        '501':
+          description: Not implemented — skeleton only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Placeholder'
+  /api/v1/questions/completion:
+    get:
+      summary: placeholder
+      responses:
+        '501':
+          description: Not implemented — skeleton only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Placeholder'
+  /api/v1/questions/pending:
+    get:
+      summary: placeholder
+      responses:
+        '501':
+          description: Not implemented — skeleton only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Placeholder'
+  /api/v1/questions/status:
+    get:
+      summary: placeholder
+      responses:
+        '501':
+          description: Not implemented — skeleton only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Placeholder'
+components:
+  schemas:
+    Placeholder:
+      type: object
+      description: Replace with Rules/15 schemas

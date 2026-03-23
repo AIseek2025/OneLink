@@ -1,0 +1,54 @@
+openapi: 3.0.3
+info:
+  title: OneLink model-gateway internal capability API (draft skeleton)
+  version: 0.1.0-draft
+  description: |
+    不对外暴露。对齐 OneLink/Rules/15-MVP-OPENAPI-DRAFT.md §10。
+    实际实现可为 gRPC；此处仅 HTTP 形状占位。
+servers:
+  - url: http://model-gateway.internal:8080
+paths:
+  /internal/v1/invoke:
+    post:
+      summary: Invoke a named model capability (placeholder)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvokeRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvokeResponse'
+components:
+  schemas:
+    Placeholder:
+      type: object
+    InvokeRequest:
+      type: object
+      properties:
+        capability_name:
+          type: string
+        trace_id:
+          type: string
+          format: uuid
+        payload:
+          type: object
+          additionalProperties: true
+    InvokeResponse:
+      type: object
+      required:
+        - capability_name
+        - model_id
+        - output_text
+      properties:
+        capability_name:
+          type: string
+        model_id:
+          type: string
+        output_text:
+          type: string

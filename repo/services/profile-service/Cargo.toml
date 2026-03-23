@@ -1,0 +1,24 @@
+[package]
+name = "profile-service"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "profile-service"
+path = "src/main.rs"
+
+[lib]
+name = "profile_service"
+path = "src/lib.rs"
+
+[dependencies]
+tokio = { workspace = true }
+axum = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+reqwest = { workspace = true }
+onelink-event-envelope = { path = "../../platform/shared-libs/onelink-event-envelope" }
+chrono = { workspace = true }

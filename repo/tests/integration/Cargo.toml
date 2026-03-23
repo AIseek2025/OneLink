@@ -1,0 +1,10 @@
+[package]
+name = "integration_chat_memory_profile_slice"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+# 无运行时依赖：HTTP smoke 通过调用 bash + 现有 shell smoke。

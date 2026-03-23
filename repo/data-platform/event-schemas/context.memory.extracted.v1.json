@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "context.memory.extracted.v1",
+  "type": "object",
+  "required": [
+    "event_id",
+    "event_name",
+    "event_version",
+    "occurred_at",
+    "producer",
+    "payload"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_name": {
+      "type": "string",
+      "const": "context.memory.extracted.v1"
+    },
+    "event_version": {
+      "type": "string"
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "producer": {
+      "type": "string",
+      "const": "context-service"
+    },
+    "trace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "actor_user_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "subject_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "payload": {
+      "type": "object",
+      "required": [
+        "user_id",
+        "source_event_id",
+        "source_event_name",
+        "artifact_candidates"
+      ],
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "conversation_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "source_event_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "source_event_name": {
+          "type": "string"
+        },
+        "artifact_candidates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "network_type",
+              "evidence_type",
+              "memory_level",
+              "content",
+              "source_type"
+            ],
+            "properties": {
+              "network_type": {
+                "type": "string",
+                "enum": [
+                  "world",
+                  "experience",
+                  "opinion",
+                  "entity"
+                ]
+              },
+              "evidence_type": {
+                "type": "string"
+              },
+              "memory_level": {
+                "type": "string",
+                "enum": [
+                  "working",
+                  "persistent"
+                ]
+              },
+              "content": {
+                "type": "string"
+              },
+              "content_structured": {
+                "type": "object"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": [
+                  "chat",
+                  "questionnaire",
+                  "behavior"
+                ]
+              },
+              "entity_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "confidence": {
+                "type": "number"
+              },
+              "importance_score": {
+                "type": "number"
+              },
+              "consistency_score": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,163 @@
+openapi: 3.0.3
+info:
+  title: OneLink profile-service
+  description: |
+    个人主页与画像（MVP / draft）。**本轮纵切面已实现**：`GET /profile/me`、`GET /profile/me/completion`。
+    默认端口 **8082**。字段对齐 `Rules/15-MVP-OPENAPI-DRAFT.md`。
+
+    **Dev-only 内部入口（不写入本 OpenAPI paths）**  
+    `POST /internal/events/receive` 消费 `profile.memory_projection.requested.v1`，须带 **`x-internal-token`**（与 `INTERNAL_SHARED_SECRET` 一致，**ai-chat / context / profile 进程需同值**）。  
+    此为 **开发态 relay**，非生产零信任方案；详见 `repo/services/profile-service/README.md`。
+  version: 0.2.0-draft
+servers:
+  - url: http://127.0.0.1:8082
+    description: 本地默认（profile-service）
+paths:
+  /api/v1/profile/me:
+    get:
+      summary: 获取个人主页
+      operationId: profileMe
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 个人主页（含记忆投影后的可见字段）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileMeResponse'
+        '401':
+          description: 未认证（透传 identity 校验）
+        '502':
+          description: identity-service 不可用
+    patch:
+      summary: 更新个人主页（未实现 / 占位）
+      responses:
+        '501':
+          description: Not implemented — skeleton only
+  /api/v1/profile/me/completion:
+    get:
+      summary: 画像完成度
+      operationId: profileMeCompletion
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 完成度维度
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileCompletionResponse'
+        '401':
+          description: 未认证
+        '502':
+          description: identity-service 不可用
+  /api/v1/profile/me/discovery:
+    get:
+      summary: placeholder
+      responses:
+        '501':
+          description: Not implemented — skeleton only
+    patch:
+      summary: placeholder
+      responses:
+        '501':
+          description: Not implemented — skeleton only
+  /api/v1/profile/me/follows:
+    get:
+      summary: placeholder
+      responses:
+        '501':
+          description: Not implemented — skeleton only
+  /api/v1/profile/follow:
+    post:
+      summary: placeholder
+      responses:
+        '501':
+          description: Not implemented — skeleton only
+    delete:
+      summary: placeholder
+      responses:
+        '501':
+          description: Not implemented — skeleton only
+  /api/v1/profile/{userId}:
+    get:
+      summary: placeholder
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '501':
+          description: Not implemented — skeleton only
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+  schemas:
+    ProfileMeResponse:
+      type: object
+      required:
+        - user_id
+        - display_name
+        - avatar_url
+        - headline
+        - bio
+        - city_level_location
+        - languages
+        - is_searchable
+        - allow_discovery
+        - updated_at
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        avatar_url:
+          type: string
+        headline:
+          type: string
+        bio:
+          type: string
+        city_level_location:
+          type: string
+        languages:
+          type: array
+          items:
+            type: string
+        is_searchable:
+          type: boolean
+        allow_discovery:
+          type: boolean
+        updated_at:
+          type: string
+          format: date-time
+    ProfileCompletionResponse:
+      type: object
+      required:
+        - completion_rate
+        - required_dimensions
+        - filled_dimensions
+        - missing_dimensions
+      properties:
+        completion_rate:
+          type: number
+          format: float
+          example: 0.65
+        required_dimensions:
+          type: array
+          items:
+            type: string
+        filled_dimensions:
+          type: array
+          items:
+            type: string
+        missing_dimensions:
+          type: array
+          items:
+            type: string

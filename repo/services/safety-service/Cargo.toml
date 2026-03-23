@@ -1,0 +1,21 @@
+[package]
+name = "safety-service"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "safety-service"
+path = "src/main.rs"
+
+[lib]
+name = "safety_service"
+path = "src/lib.rs"
+
+[dependencies]
+tokio = { workspace = true }
+axum = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

@@ -1,0 +1,30 @@
+{
+  "suite": "Entity-aware observability",
+  "description": "断言 observability 中 entity_hits 与实现一致：显式点名实体或「问城市」类查询应对齐已抽取的 location 实体。",
+  "setup_messages": [
+    "我现在在上海做AI产品",
+    "我不喜欢被推销式沟通"
+  ],
+  "cases": [
+    {
+      "id": "v21-entity-implicit-location-query",
+      "query": "用户现在在哪个城市？",
+      "expected_contains": ["上海"],
+      "expected_candidate_route": "L1",
+      "benchmark_v2_1": {
+        "min_entity_hits": 1,
+        "rationale": "查询含「城市/在哪」但未重复写城市名时，实现会将用户已有 location 实体纳入 matched_entity_ids，entity_hits>0。"
+      }
+    },
+    {
+      "id": "v21-entity-explicit-上海-in-query",
+      "query": "用户提到过上海吗？",
+      "expected_contains": ["上海"],
+      "expected_candidate_route": "L1",
+      "benchmark_v2_1": {
+        "min_entity_hits": 1,
+        "rationale": "查询显式包含「上海」，应与 location 实体名匹配，entity_hits>0。"
+      }
+    }
+  ]
+}

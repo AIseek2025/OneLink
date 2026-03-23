@@ -1,0 +1,674 @@
+openapi: 3.0.3
+info:
+  title: OneLink context-service internal API (draft skeleton)
+  version: 0.1.0-draft
+  description: |
+    不对外暴露。对齐 OneLink/Rules/15-MVP-OPENAPI-DRAFT.md §9（context-service）。
+    Memory Compute Layer：extraction / distillation / context assembly。
+    向量检索超时或不可用时，实现侧应降级为 working memory + 最近 summaries，跳过 persistent 向量召回（见 Rules/19）。
+    所有 `/internal/*` 路径均要求 **`x-internal-token`**，其值与 **`INTERNAL_SHARED_SECRET`** 一致。
+    这是 dev-only 服务间共享口令，不是生产级服务身份方案。
+servers:
+  - url: http://context-service.internal:8080
+paths:
+  /internal/context/build:
+    post:
+      summary: Assemble model context with token budget
+      security:
+        - internalToken: []
+      description: |
+        同步组装上下文；max_tokens / memory_limit / summary_limit 为契约必填项。
+        调用方可传 `trace_id`，用于把 routing / failure 观测关联回上游 chat 请求。
+        降级策略见 Rules/19-CONTEXT-MEMORY-ARCHITECTURE.md。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContextBuildRequest'
+      responses:
+        '200':
+          description: Success (current MVP returns deterministic L1 context + route metadata)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContextBuildResponse'
+        '401':
+          description: Missing or invalid x-internal-token
+  /internal/memory/write:
+    post:
+      summary: Internal memory write hook
+      security:
+        - internalToken: []
+      description: |
+        MVP 默认以事件消费写记忆为主；当前实现也支持最小 direct-internal 写入，
+        会生成 artifact 与 summary，并返回真实 trace_id。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemoryWriteRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryWriteResponse'
+        '401':
+          description: Missing or invalid x-internal-token
+  /internal/memory/search:
+    get:
+      summary: Internal memory search
+      security:
+        - internalToken: []
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Success (current MVP returns deterministic L1 matches)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemorySearchResponse'
+        '401':
+          description: Missing or invalid x-internal-token
+  /internal/session/checkpoint:
+    post:
+      summary: Save runtime checkpoint
+      security:
+        - internalToken: []
+      description: |
+        当前 MVP 对相同请求体做幂等重试，`runtime_state_blob` 与 `policy_versions`
+        以 canonical JSON 参与 dedupe key 生成，重复请求返回同一 `checkpoint_id`。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionCheckpointRequest'
+      responses:
+        '200':
+          description: Success (current MVP stores checkpoint in-memory)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionCheckpointResponse'
+        '401':
+          description: Missing or invalid x-internal-token
+  /internal/memory/consolidate:
+    post:
+      summary: Internal memory consolidate trigger
+      security:
+        - internalToken: []
+      description: |
+        当前 MVP 以 `event_id` 做幂等；若 `artifact_ids` 为空，或一个都解析不到有效 artifact，
+        则返回 `accepted=false` 且不占用幂等索引，允许同一 `event_id` 后续带有效 `artifact_ids` 重试。
+        若某次已成功写入 summary，则同一 `event_id` 的重复请求返回成功，但不重复写入新 summary。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemoryConsolidateRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryConsolidateResponse'
+        '401':
+          description: Missing or invalid x-internal-token
+  /internal/memory/resolve:
+    post:
+      summary: Resolve memory artifact payloads for downstream projection
+      security:
+        - internalToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemoryResolveRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryResolveResponse'
+        '401':
+          description: Missing or invalid x-internal-token
+  /internal/events/receive:
+    post:
+      summary: Receive dev-only HTTP envelope relay events
+      security:
+        - internalToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventEnvelope'
+      responses:
+        '202':
+          description: Accepted
+        '401':
+          description: Missing or invalid x-internal-token
+  /internal/observability/asmr-lite:
+    get:
+      summary: Inspect in-memory ASMR-Lite routing and failure counters
+      security:
+        - internalToken: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsmrLiteObservabilityResponse'
+        '401':
+          description: Missing or invalid x-internal-token
+components:
+  securitySchemes:
+    internalToken:
+      type: apiKey
+      in: header
+      name: x-internal-token
+  schemas:
+    Placeholder:
+      type: object
+    ContextBuildRequest:
+      type: object
+      required:
+        - user_id
+        - agent_id
+        - conversation_id
+        - input
+        - task_type
+        - max_tokens
+        - memory_limit
+        - summary_limit
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        agent_id:
+          type: string
+          format: uuid
+        conversation_id:
+          type: string
+          format: uuid
+        input:
+          type: string
+        task_type:
+          type: string
+          example: chat
+        max_tokens:
+          type: integer
+          example: 8000
+        memory_limit:
+          type: integer
+          example: 20
+        summary_limit:
+          type: integer
+          example: 3
+        reply_style:
+          type: string
+          enum:
+            - brief
+            - balanced
+            - deep
+          example: brief
+        trace_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Optional upstream trace id for observability correlation
+        retrieval_modes:
+          type: array
+          items:
+            type: string
+    MemoryWriteRequest:
+      type: object
+      description: |
+        MVP 以事件消费写记忆为主；当前实现支持最小 direct-internal 写入。
+      required:
+        - user_id
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        source_type:
+          type: string
+        source_service:
+          type: string
+        source_ref_id:
+          type: string
+          format: uuid
+        raw_text:
+          type: string
+        memory_value_score:
+          type: number
+          description: |
+            请求层统一候选分值；实现侧可把它映射到 importance_score 等内部评分字段，
+            不要求与 memory_artifacts 表字段同名。
+    MemoryWriteResponse:
+      type: object
+      required:
+        - accepted
+        - write_mode
+        - trace_id
+      properties:
+        accepted:
+          type: boolean
+        write_mode:
+          type: string
+          enum:
+            - direct_internal
+            - noop_missing_raw_text
+        trace_id:
+          type: string
+          format: uuid
+    MemorySearchItem:
+      type: object
+      required:
+        - memory_id
+        - network_type
+        - memory_level
+        - content
+        - confidence
+        - preference_polarity
+      properties:
+        memory_id:
+          type: string
+          format: uuid
+        network_type:
+          type: string
+        memory_level:
+          type: string
+          enum:
+            - working
+            - persistent
+        content:
+          type: string
+        confidence:
+          type: number
+        preference_polarity:
+          type: string
+          description: Distiller-derived preference polarity on the evidence (positive | negative | neutral)
+          enum:
+            - positive
+            - negative
+            - neutral
+    MemorySearchResponse:
+      type: object
+      required:
+        - items
+        - next_cursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemorySearchItem'
+        next_cursor:
+          type: string
+          nullable: true
+    ContextBuildResponse:
+      type: object
+      required:
+        - system_prompt
+        - user_context
+        - memory_context
+        - task_context
+        - selected_summary_ids
+        - selected_memory_ids
+        - retrieval_used
+        - degraded
+        - token_budget
+      properties:
+        system_prompt:
+          type: string
+        user_context:
+          type: string
+        memory_context:
+          type: string
+          description: >
+            MVP L1 证据摘要字符串；非空时可含子串 query_polarity_hint=、pref_top=、entity_hits= 等（与实现 format 一致，详见 Rules-V2/CONTRACTS/context-service-contract.md）。
+        task_context:
+          type: string
+          description: >
+            路由与耗时等键值片段；含 query_preference_polarity 与 evidence_preference_polarity（positive|negative|neutral），与 GET /internal/observability/asmr-lite routing.last_observation 对齐。
+        selected_summary_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        selected_memory_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        retrieval_used:
+          type: array
+          items:
+            type: string
+        degraded:
+          type: boolean
+        token_budget:
+          $ref: '#/components/schemas/TokenBudget'
+    SessionCheckpointRequest:
+      type: object
+      required:
+        - agent_id
+        - user_id
+        - schema_version
+      properties:
+        agent_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        conversation_id:
+          type: string
+          format: uuid
+        schema_version:
+          type: integer
+        working_summary_ref:
+          type: string
+          format: uuid
+        runtime_state_blob:
+          type: object
+          additionalProperties: true
+        policy_versions:
+          type: object
+          additionalProperties:
+            type: string
+    SessionCheckpointResponse:
+      type: object
+      required:
+        - accepted
+        - checkpoint_id
+      properties:
+        accepted:
+          type: boolean
+        checkpoint_id:
+          type: string
+          format: uuid
+    MemoryConsolidateRequest:
+      type: object
+      required:
+        - event_id
+        - user_id
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        artifact_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        mode:
+          type: string
+          example: incremental
+    MemoryConsolidateResponse:
+      type: object
+      required:
+        - accepted
+        - replayable
+      properties:
+        accepted:
+          type: boolean
+        replayable:
+          type: boolean
+    MemoryResolveRequest:
+      type: object
+      required:
+        - memory_ids
+      properties:
+        memory_ids:
+          type: array
+          items:
+            type: string
+    MemoryResolveItem:
+      type: object
+      required:
+        - memory_id
+        - content
+        - network_type
+      properties:
+        memory_id:
+          type: string
+        content:
+          type: string
+        network_type:
+          type: string
+    MemoryResolveResponse:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemoryResolveItem'
+    EventEnvelope:
+      type: object
+      required:
+        - event_id
+        - event_name
+        - producer
+        - payload
+      properties:
+        event_id:
+          type: string
+        event_name:
+          type: string
+        producer:
+          type: string
+        subject_id:
+          type: string
+          nullable: true
+        trace_id:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+    AsmrLiteObservabilityResponse:
+      type: object
+      required:
+        - artifact_count
+        - summary_count
+        - entity_count
+        - link_count
+        - checkpoint_count
+        - total_failures
+        - routing
+        - recent_failures
+      properties:
+        artifact_count:
+          type: integer
+        summary_count:
+          type: integer
+        entity_count:
+          type: integer
+        link_count:
+          type: integer
+        checkpoint_count:
+          type: integer
+        total_failures:
+          type: integer
+        routing:
+          $ref: '#/components/schemas/RoutingMetricsView'
+        recent_failures:
+          type: array
+          items:
+            $ref: '#/components/schemas/FailureCaseView'
+    RoutingMetricsView:
+      type: object
+      required:
+        - total_requests
+        - l1_requests
+        - l2_candidates
+        - l3_candidates
+        - degraded_requests
+        - total_conflicts
+      properties:
+        total_requests:
+          type: integer
+        l1_requests:
+          type: integer
+        l2_candidates:
+          type: integer
+        l3_candidates:
+          type: integer
+        degraded_requests:
+          type: integer
+        total_conflicts:
+          type: integer
+        last_observation:
+          $ref: '#/components/schemas/RoutingObservationView'
+          nullable: true
+    RoutingObservationView:
+      type: object
+      required:
+        - executed_route
+        - candidate_route
+        - escalation_reasons
+        - upgraded
+        - evidence_count
+        - summary_hits
+        - artifact_hits
+        - entity_hits
+        - conflict_count
+        - route_confidence
+        - estimated_llm_calls
+        - estimated_tokens
+        - query_preview
+        - degraded
+        - elapsed_ms
+        - query_preference_polarity
+        - evidence_preference_polarity
+      properties:
+        executed_route:
+          type: string
+        candidate_route:
+          type: string
+        escalation_reasons:
+          type: array
+          items:
+            type: string
+        upgraded:
+          type: boolean
+        evidence_count:
+          type: integer
+        summary_hits:
+          type: integer
+        artifact_hits:
+          type: integer
+        entity_hits:
+          type: integer
+        conflict_count:
+          type: integer
+        route_confidence:
+          type: number
+          description: Deterministic MVP confidence-like signal from L1 evidence ranking
+        estimated_llm_calls:
+          type: integer
+          description: MVP route-cost hint; current implementation records 0 for pure L1 and 1 for deferred upgrade candidates
+        estimated_tokens:
+          type: integer
+          description: MVP token estimate derived from selected evidence text length
+        query_preview:
+          type: string
+        degraded:
+          type: boolean
+        elapsed_ms:
+          type: integer
+        query_preference_polarity:
+          type: string
+          description: Query-side inferred polarity when the question is preference-like; otherwise neutral
+          enum:
+            - positive
+            - negative
+            - neutral
+        evidence_preference_polarity:
+          type: string
+          description: Polarity on the highest-ranked L1 evidence (neutral if none)
+          enum:
+            - positive
+            - negative
+            - neutral
+    FailureCaseView:
+      type: object
+      required:
+        - id
+        - user_id
+        - stage
+        - category
+        - detail
+        - retryable
+        - attempt_count
+        - created_at
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        stage:
+          type: string
+        category:
+          type: string
+        detail:
+          type: string
+        trace_id:
+          type: string
+          nullable: true
+        retryable:
+          type: boolean
+        attempt_count:
+          type: integer
+        created_at:
+          type: string
+    TokenBudget:
+      type: object
+      required:
+        - max_tokens
+        - memory_limit
+        - summary_limit
+      properties:
+        max_tokens:
+          type: integer
+        memory_limit:
+          type: integer
+        summary_limit:
+          type: integer

@@ -1,0 +1,209 @@
+openapi: 3.0.3
+info:
+  title: OneLink identity-service
+  description: |
+    账户与会话（MVP / draft）。**本轮纵切面已实现**：`register`、`login`、`me`（in-memory token）。
+    其余路径仍为骨架占位。字段口径对齐 `Rules/15-MVP-OPENAPI-DRAFT.md`。
+    默认端口 **8081**（`PORT` 可覆盖）；不经 api-gateway 直连时使用下列 server。
+
+    **会话过期（与实现一致）**  
+    `register` / `login` 返回的 `session.expires_at` 为 **真实截止时间**（当前实现：签发时刻起 **30 天**）。  
+    `GET /api/v1/identity/me` 在 token 过期后返回 **401**（`token expired`），服务端会移除该 session。
+  version: 0.2.0-draft
+servers:
+  - url: http://127.0.0.1:8081
+    description: 本地默认（identity-service）
+paths:
+  /api/v1/identity/register:
+    post:
+      summary: 用户注册
+      description: |
+        MVP：`provider` 支持 `email` 或 `password`；需 `email`、`password_hash`、`primary_region`、`primary_language`。
+        重复邮箱返回 409。成功时签发 Bearer token（响应体非 `data` envelope）。
+      operationId: identityRegister
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            examples:
+              minimal:
+                value:
+                  provider: email
+                  email: user@example.com
+                  password_hash: dev-only-plaintext
+                  primary_region: CN
+                  primary_language: zh
+      responses:
+        '200':
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '400':
+          description: 参数错误
+        '409':
+          description: 已注册
+  /api/v1/identity/login:
+    post:
+      summary: 登录
+      description: MVP 同注册：`email` + `password_hash`。
+      operationId: identityLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              minimal:
+                value:
+                  provider: email
+                  email: user@example.com
+                  password_hash: dev-only-plaintext
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: 参数错误
+        '401':
+          description: 凭证无效
+  /api/v1/identity/me:
+    get:
+      summary: 当前用户
+      operationId: identityMe
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 当前用户信息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+        '401':
+          description: 未认证、token 无效或 token 已过期（`expires_at` 已届满）
+  /api/v1/identity/bind:
+    post:
+      summary: 绑定登录方式（未实现）
+      responses:
+        '501':
+          description: Not implemented — skeleton only
+  /api/v1/identity/refresh:
+    post:
+      summary: 刷新会话（未实现）
+      responses:
+        '501':
+          description: Not implemented — skeleton only
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+  schemas:
+    RegisterRequest:
+      type: object
+      required:
+        - provider
+        - primary_region
+        - primary_language
+      properties:
+        provider:
+          type: string
+          enum: [email, sms, password]
+        email:
+          type: string
+        phone:
+          type: string
+        password_hash:
+          type: string
+        verification_code:
+          type: string
+        primary_region:
+          type: string
+        primary_language:
+          type: string
+    RegisterResponse:
+      type: object
+      required:
+        - user_id
+        - session
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        session:
+          $ref: '#/components/schemas/SessionPayload'
+    LoginRequest:
+      type: object
+      required:
+        - provider
+      properties:
+        provider:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        password_hash:
+          type: string
+        oauth_token:
+          type: string
+        verification_code:
+          type: string
+    LoginResponse:
+      type: object
+      required:
+        - user_id
+        - session
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        session:
+          $ref: '#/components/schemas/SessionPayload'
+    SessionPayload:
+      type: object
+      required:
+        - token
+        - expires_at
+      properties:
+        token:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+          description: |
+            ISO8601。**服务端会按该时间校验**：超过后 `GET /me` 拒绝（401）。
+            TTL 由实现固定（当前 MVP：**30 天**），非 refresh token 模式。
+    MeResponse:
+      type: object
+      required:
+        - user_id
+        - status
+        - primary_region
+        - primary_language
+        - timezone
+        - created_at
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        primary_region:
+          type: string
+        primary_language:
+          type: string
+        timezone:
+          type: string
+        created_at:
+          type: string
+          format: date-time

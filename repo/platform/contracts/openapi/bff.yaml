@@ -1,0 +1,110 @@
+openapi: 3.0.3
+info:
+  title: OneLink bff
+  description: |
+    BFF 聚合层（MVP / draft）。**本轮纵切面已实现**：`GET /api/v1/bff/chat/init`。
+    BFF **不解析** token 语义，仅 **透传** `Authorization` 至 `identity-service` 与 `ai-chat-service`。
+    默认端口 **8083**。响应形状对齐 `Rules/15-MVP-OPENAPI-DRAFT.md` §10.2。
+
+    **与下游鉴权的关系**  
+    `ai-chat-service` 的会话/消息读接口需 Bearer + 属主校验；BFF 只透传头，**不**携带 `x-internal-token`（内部 secret 仅服务间使用）。  
+    本地起 `ai-chat` / `context` / `profile` 时须配置一致的 `INTERNAL_SHARED_SECRET`，否则异步 relay 会失败（见各服务 README）。
+  version: 0.2.0-draft
+servers:
+  - url: http://127.0.0.1:8083
+    description: 本地默认（bff）
+paths:
+  /api/v1/bff/chat/init:
+    get:
+      summary: AI 聊天页初始化
+      operationId: bffChatInit
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: identity.me + getOrCreateConversation + 空问卷占位
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatInitResponse'
+              examples:
+                minimal:
+                  value:
+                    user:
+                      user_id: 00000000-0000-0000-0000-000000000001
+                      status: active
+                      primary_region: CN
+                      primary_language: zh
+                      timezone: UTC
+                      created_at: '2026-03-20T00:00:00.000Z'
+                    conversation:
+                      conversation_id: 00000000-0000-0000-0000-000000000001
+                      status: active
+                      created_at: '2026-03-20T00:00:00Z'
+                    pending_questions: []
+        '401':
+          description: 未认证或上游 identity 拒绝
+        '502':
+          description: 上游 ai-chat 或 identity 不可用
+  /api/v1/bff/home:
+    get:
+      summary: placeholder
+      responses:
+        '501':
+          description: Not implemented — skeleton only
+  /api/v1/bff/onboarding:
+    get:
+      summary: placeholder
+      responses:
+        '501':
+          description: Not implemented — skeleton only
+  /api/v1/bff/find/results:
+    get:
+      summary: placeholder
+      responses:
+        '501':
+          description: Not implemented — skeleton only
+  /api/v1/bff/dm/list:
+    get:
+      summary: placeholder
+      responses:
+        '501':
+          description: Not implemented — skeleton only
+  /api/v1/bff/profile/{userId}:
+    get:
+      summary: placeholder
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '501':
+          description: Not implemented — skeleton only
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+  schemas:
+    ChatInitResponse:
+      type: object
+      required:
+        - user
+        - conversation
+        - pending_questions
+      properties:
+        user:
+          type: object
+          description: identity `GET /api/v1/identity/me` 的 JSON 体
+          additionalProperties: true
+        conversation:
+          type: object
+          description: ai-chat `POST /api/v1/chat/conversations` 的 JSON 体
+          additionalProperties: true
+        pending_questions:
+          type: array
+          description: 本轮占位为空数组
+          items: {}
