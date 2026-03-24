@@ -90,6 +90,23 @@ pub fn heuristic_extract(user_message: &str) -> Vec<Value> {
         }));
     }
 
+    // 显式沟通风格子句：与 profile-service Phase B `explicit_communication_preference_value` 口径对齐。
+    // 长句会被拆成多条短 artifact；若不单独抽出含「拐弯抹角 / 希望直接一点」等片段，profile 侧永远收不到可映射文本。
+    if let Some(clause) = extract_explicit_communication_clause(t) {
+        out.push(json!({
+            "network_type": "opinion",
+            "evidence_type": "fact",
+            "memory_level": "persistent",
+            "content": clause,
+            "content_structured": { "kind": "communication_preference", "topic": "style" },
+            "source_type": "chat",
+            "confidence": 0.88,
+            "importance_score": 0.76,
+            "consistency_score": 0.86,
+            "entity_refs": []
+        }));
+    }
+
     if t.contains("创业") || lowered.contains("startup") {
         out.push(json!({
             "network_type": "opinion",
@@ -167,6 +184,84 @@ pub fn heuristic_extract(user_message: &str) -> Vec<Value> {
     }
 
     out
+}
+
+/// 从整句中切出**单条**显式沟通偏好子句（按 `；` / `;` 分片），供 profile 映射 `communication_preference`。
+fn extract_explicit_communication_clause(t: &str) -> Option<String> {
+    for part in t.split(|c| c == '；' || c == ';') {
+        let p = part.trim();
+        if p.is_empty() {
+            continue;
+        }
+        if clause_is_explicit_communication_preference(p) {
+            return Some(p.to_string());
+        }
+    }
+    let whole = t.trim();
+    if clause_is_explicit_communication_preference(whole) {
+        return Some(whole.to_string());
+    }
+    None
+}
+
+/// 与 `profile-service` `projection::explicit_communication_preference_value` 保持同构，避免泛化极性包装。
+fn clause_is_explicit_communication_preference(p: &str) -> bool {
+    if p.contains("不要推销")
+        || p.contains("别推销")
+        || p.contains("讨厌推销")
+        || p.contains("不要推销式")
+        || p.contains("推销式")
+    {
+        return true;
+    }
+    if p.contains("拐弯抹角")
+        && (p.contains("不喜欢")
+            || p.contains("讨厌")
+            || p.contains("别")
+            || p.contains("不要"))
+    {
+        return true;
+    }
+    if p.contains("直接一点") || p.contains("直接一些") || p.contains("直接些") {
+        return true;
+    }
+    if (p.contains("喜欢") || p.contains("希望") || p.contains("想要") || p.contains("更"))
+        && p.contains("直接")
+        && (p.contains("沟通") || p.contains("说话") || p.contains("表达") || p.contains("点"))
+    {
+        return true;
+    }
+    if p.contains("沟通方式")
+        || p.contains("邮件联系")
+        || p.contains("不要打电话")
+        || p.contains("别打电话")
+    {
+        return true;
+    }
+    if p.contains("微信") && (p.contains("联系") || p.contains("加我") || p.contains("用微信")) {
+        return true;
+    }
+    false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn smoke_like_message_emits_explicit_communication_clause_artifact() {
+        let msg = "我对 AI 创业很感兴趣，希望认识投资人；沟通上不喜欢拐弯抹角，希望直接一点。";
+        let v = heuristic_extract(msg);
+        let contents: Vec<&str> = v
+            .iter()
+            .filter_map(|x| x.get("content").and_then(|c| c.as_str()))
+            .collect();
+        assert!(
+            contents.iter().any(|c| c.contains("拐弯抹角") && c.contains("不喜欢")),
+            "expected communication clause artifact, got: {:?}",
+            contents
+        );
+    }
 }
 
 fn extract_city_after_markers<'a>(input: &'a str, markers: &[&str]) -> Option<&'a str> {
