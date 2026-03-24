@@ -5,10 +5,15 @@ info:
     个人主页与画像（MVP / draft）。**本轮纵切面已实现**：`GET /profile/me`、`GET /profile/me/completion`。
     默认端口 **8082**。字段对齐 `Rules/15-MVP-OPENAPI-DRAFT.md`。
 
+    **结构化画像投影 Phase A（当前实现）**  
+    - **事实层**：`GET /profile/me` 响应中的 `facts[]`（`fact_type`、`value`、Phase B 起可选 `confidence` / `source_memory_id` / `source_message_id`），来源于消费投影事件后经 `context /internal/memory/resolve` 拉取记忆行、在 **profile-service 内**启发式映射；**非**完整画像引擎。  
+    - **Trait 聚合层**：`traits`（`interest_tags`、`connection_goal_tags`、`location_label`、`communication_preferences`）由事实层派生，与 facts 同步刷新。  
+    - **派生展示层**：`headline`、`bio` 仍返回且可由事实/trait **派生生成**，便于兼容旧观测与 `benchmark-asmr-lite-v1`；**不作为** `completion` 的主计分依据。`memory_highlights` 当前仅在服务内部用于派生，**不**出现在本响应体中（与实现一致）。
+
     **Dev-only 内部入口（不写入本 OpenAPI paths）**  
     `POST /internal/events/receive` 消费 `profile.memory_projection.requested.v1`，须带 **`x-internal-token`**（与 `INTERNAL_SHARED_SECRET` 一致，**ai-chat / context / profile 进程需同值**）。  
     此为 **开发态 relay**，非生产零信任方案；详见 `repo/services/profile-service/README.md`。
-  version: 0.2.0-draft
+  version: 0.3.0-draft
 servers:
   - url: http://127.0.0.1:8082
     description: 本地默认（profile-service）
@@ -21,7 +26,8 @@ paths:
         - bearerAuth: []
       responses:
         '200':
-          description: 个人主页（含记忆投影后的可见字段）
+          description: |
+            个人主页。含 **Phase A** 结构化字段 `facts` / `traits`（事实与聚合层），以及派生展示字段 `headline` / `bio`。
           content:
             application/json:
               schema:
@@ -43,7 +49,8 @@ paths:
         - bearerAuth: []
       responses:
         '200':
-          description: 完成度维度
+          description: |
+            完成度。**Phase A** 按 5 个结构化维度计分：`display_name`、`interest_tags`、`connection_goals`、`current_location`、`communication_preferences`（见 `ProfileCompletionResponse` 说明）。不再以 `headline`/`bio`/「是否有 memory 摘要行」为主维度。
           content:
             application/json:
               schema:
@@ -112,20 +119,26 @@ components:
         - is_searchable
         - allow_discovery
         - updated_at
+        - facts
+        - traits
       properties:
         user_id:
           type: string
           format: uuid
         display_name:
           type: string
+          description: 真实资料值；新用户在未填写时可为空串。
         avatar_url:
           type: string
         headline:
           type: string
+          description: 派生展示层；记忆投影后常含「记忆已同步」等摘要（实现依赖启发式，勿当作稳定契约文案）。
         bio:
           type: string
+          description: 派生展示层；可由结构化 traits 拼出摘要句。
         city_level_location:
           type: string
+          description: 用户填写或可由 `location` 类事实回填（Phase A MVP）。
         languages:
           type: array
           items:
@@ -137,6 +150,67 @@ components:
         updated_at:
           type: string
           format: date-time
+        facts:
+          type: array
+          description: Phase A 事实层；`fact_type` 取值见 `ProfileFactItem`。
+          items:
+            $ref: '#/components/schemas/ProfileFactItem'
+        traits:
+          $ref: '#/components/schemas/ProfileTraitSnapshot'
+    ProfileFactItem:
+      type: object
+      required:
+        - fact_type
+        - value
+      properties:
+        fact_type:
+          type: string
+          description: MVP 取值 `interest` | `goal` | `location` | `communication_preference`（与实现 `projection.rs` 一致）。
+          enum:
+            - interest
+            - goal
+            - location
+            - communication_preference
+        value:
+          type: string
+          description: 事实文本；具体措辞为启发式结果，集成测试勿硬编码整句。
+        confidence:
+          type: number
+          format: float
+          description: Phase B 启发式置信度 0~1（非模型分）。
+        source_memory_id:
+          type: string
+          description: Phase B 溯源：context 记忆行 id。
+        source_message_id:
+          type: string
+          description: Phase B 溯源：来源聊天消息 id（若上游写入记忆时具备）。
+    ProfileTraitSnapshot:
+      type: object
+      required:
+        - interest_tags
+        - connection_goal_tags
+        - location_label
+        - communication_preferences
+      properties:
+        interest_tags:
+          type: array
+          items:
+            type: string
+          description: 由 `interest` 事实聚合的标签列表。
+        connection_goal_tags:
+          type: array
+          items:
+            type: string
+          description: 由 `goal` 事实聚合。
+        location_label:
+          type: string
+          nullable: true
+          description: 首条 `location` 事实的值；无则为 null。
+        communication_preferences:
+          type: array
+          items:
+            type: string
+          description: 由显式 `communication_preference` 事实聚合（Phase B 起不再从泛化极性派生）。
     ProfileCompletionResponse:
       type: object
       required:
@@ -148,11 +222,14 @@ components:
         completion_rate:
           type: number
           format: float
-          example: 0.65
+          description: filled_dimensions 数量 / required_dimensions 数量（各 0~1），结果再 round 到两位小数。
+          example: 0.6
         required_dimensions:
           type: array
           items:
             type: string
+          description: |
+            Phase A 固定 5 维（顺序不保证）：`display_name`、`interest_tags`、`connection_goals`、`current_location`、`communication_preferences`。
         filled_dimensions:
           type: array
           items:

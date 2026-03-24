@@ -4,6 +4,7 @@ pub mod config;
 pub mod errors;
 pub mod health;
 pub mod http;
+pub mod projection;
 
 use std::net::SocketAddr;
 
