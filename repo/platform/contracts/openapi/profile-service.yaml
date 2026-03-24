@@ -5,15 +5,15 @@ info:
     个人主页与画像（MVP / draft）。**本轮纵切面已实现**：`GET /profile/me`、`GET /profile/me/completion`。
     默认端口 **8082**。字段对齐 `Rules/15-MVP-OPENAPI-DRAFT.md`。
 
-    **结构化画像投影 Phase A（当前实现）**  
-    - **事实层**：`GET /profile/me` 响应中的 `facts[]`（`fact_type`、`value`、Phase B 起可选 `confidence` / `source_memory_id` / `source_message_id`），来源于消费投影事件后经 `context /internal/memory/resolve` 拉取记忆行、在 **profile-service 内**启发式映射；**非**完整画像引擎。  
-    - **Trait 聚合层**：`traits`（`interest_tags`、`connection_goal_tags`、`location_label`、`communication_preferences`）由事实层派生，与 facts 同步刷新。  
-    - **派生展示层**：`headline`、`bio` 仍返回且可由事实/trait **派生生成**，便于兼容旧观测与 `benchmark-asmr-lite-v1`；**不作为** `completion` 的主计分依据。`memory_highlights` 当前仅在服务内部用于派生，**不**出现在本响应体中（与实现一致）。
+    **结构化画像投影 Phase A + Phase B（当前实现）**  
+    - **事实层** `facts[]`：`fact_type`、`value`；Phase B 起每条事实另含 **`confidence`（启发式 0~1，非模型分）**、**`source_memory_id`（对应 resolve 的 memory 行）**；**`source_message_id`** 仅在上游写入记忆时已携带来源消息 id 时出现。事实由消费 `profile.memory_projection.requested.v1` 后调用 `context /internal/memory/resolve` 再于 **profile-service 内**启发式映射得到；**非**完整画像引擎，也**非**完整 provenance 体系。  
+    - **Trait 聚合层** `traits`：`interest_tags`、`connection_goal_tags`、`location_label`（**必填字段，无地点时为 JSON null**）、`communication_preferences`；由事实层派生，与 `facts` 同步刷新。`communication_preferences` **仅**来自显式 `communication_preference` 事实（Phase B 起**不**再由泛化 `preference_polarity` 包装成沟通偏好）。  
+    - **派生展示层**：`headline`、`bio` 仍返回且可由事实/trait **派生生成**，便于兼容旧观测与 `benchmark-asmr-lite-v1`；**不作为** `completion` 的主计分依据。`memory_highlights` 仅在服务内部用于派生，**不**出现在本响应体中（与实现一致）。
 
     **Dev-only 内部入口（不写入本 OpenAPI paths）**  
     `POST /internal/events/receive` 消费 `profile.memory_projection.requested.v1`，须带 **`x-internal-token`**（与 `INTERNAL_SHARED_SECRET` 一致，**ai-chat / context / profile 进程需同值**）。  
     此为 **开发态 relay**，非生产零信任方案；详见 `repo/services/profile-service/README.md`。
-  version: 0.3.0-draft
+  version: 0.3.1-draft
 servers:
   - url: http://127.0.0.1:8082
     description: 本地默认（profile-service）
@@ -27,7 +27,7 @@ paths:
       responses:
         '200':
           description: |
-            个人主页。含 **Phase A** 结构化字段 `facts` / `traits`（事实与聚合层），以及派生展示字段 `headline` / `bio`。
+            个人主页。含 **Phase A/B** 结构化字段 `facts` / `traits`（事实层与聚合层），以及派生展示字段 `headline` / `bio`。
           content:
             application/json:
               schema:
@@ -50,7 +50,7 @@ paths:
       responses:
         '200':
           description: |
-            完成度。**Phase A** 按 5 个结构化维度计分：`display_name`、`interest_tags`、`connection_goals`、`current_location`、`communication_preferences`（见 `ProfileCompletionResponse` 说明）。不再以 `headline`/`bio`/「是否有 memory 摘要行」为主维度。
+            完成度。按 5 个结构化维度计分（Phase A 起，Phase B **不变**）：`display_name`、`interest_tags`、`connection_goals`、`current_location`、`communication_preferences`（见 `ProfileCompletionResponse` 说明）。不以 `headline`/`bio`/「是否有 memory 摘要行」为主维度；**不计入** `facts[].confidence` 等 Phase B 字段。
           content:
             application/json:
               schema:
@@ -152,7 +152,7 @@ components:
           format: date-time
         facts:
           type: array
-          description: Phase A 事实层；`fact_type` 取值见 `ProfileFactItem`。
+          description: 事实层（Phase A/B）；`fact_type` 与 Phase B 可信度/溯源字段见 `ProfileFactItem`。
           items:
             $ref: '#/components/schemas/ProfileFactItem'
         traits:
@@ -162,6 +162,8 @@ components:
       required:
         - fact_type
         - value
+        - confidence
+        - source_memory_id
       properties:
         fact_type:
           type: string
@@ -177,13 +179,15 @@ components:
         confidence:
           type: number
           format: float
-          description: Phase B 启发式置信度 0~1（非模型分）。
+          minimum: 0
+          maximum: 1
+          description: Phase B 启发式置信度（非模型分）；实现侧对每条投影事实均写入。
         source_memory_id:
           type: string
-          description: Phase B 溯源：context 记忆行 id。
+          description: Phase B 最小溯源：与 `context` `POST /internal/memory/resolve` 返回项的 `memory_id` 对齐。
         source_message_id:
           type: string
-          description: Phase B 溯源：来源聊天消息 id（若上游写入记忆时具备）。
+          description: 可选溯源：来源聊天消息 id（仅当上游 artifact/summary 携带非空 `source_message_id` 时返回）。
     ProfileTraitSnapshot:
       type: object
       required:

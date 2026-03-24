@@ -167,6 +167,11 @@
 - match: submitFindRequest, getClarification, submitClarification, getResultSet, reportFeedback
 - safety: submitReport, getReportStatus, getModerationSummary, submitAppeal
 
+### 4.4 profile-service：结构化画像投影 Phase A + Phase B（纵切面，与实现同步）
+
+- **`GET /api/v1/profile/me`**：在既有主页字段外返回 **`facts[]`**（`fact_type`、`value`；Phase B 另有 **`confidence`、`source_memory_id`**，以及可选 **`source_message_id`**）与 **`traits`**（兴趣/目标/`location_label` 可为 null/沟通偏好聚合）。事实映射仅在 **profile-service** 内完成（消费 `profile.memory_projection.requested.v1` 后调用 `context /internal/memory/resolve`）。**沟通偏好**仅来自显式沟通类事实，**不**将 context 的泛化 `preference_polarity` 包装为 `communication_preference`。
+- **`GET /api/v1/profile/me/completion`**：按 **五维** 覆盖率计分：`display_name`、`interest_tags`、`connection_goals`、`current_location`、`communication_preferences`（详见 `platform/contracts/openapi/profile-service.yaml`）。**不是**完整画像引擎或问卷完成度模型；`confidence`/`source_memory_id` **不参与** completion 公式。
+
 ---
 
 ## 5. 契约文件产出建议

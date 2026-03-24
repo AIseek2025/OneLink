@@ -6,7 +6,8 @@
 # 启动各服务时若未设置 env，实现默认 onelink-dev-internal-token；若你改 secret，须 ai-chat / context / profile 三进程一致。
 # 本 smoke 只调用 **公开** API + Bearer，不在此脚本伪造内部调用链。
 # 若要跑固定成功样本 + 升级样本，请改用 scripts/benchmark-asmr-lite-v1.sh。
-# Phase A：本脚本在 profile /me 与 completion 请求后会做 **结构化投影** 最小断言（facts / traits / completion 维度），
+# Phase A/B：本脚本在 profile /me 与 completion 请求后校验 **结构化投影**（facts / traits / completion 维度），
+# Phase B 起额外校验事实层 **最小可追溯性**（非空 source_memory_id、confidence ∈ [0,1]、traits.location_label 键存在），
 # 失败时 exit 1；入口路径与依赖不变。
 #
 # 可选：在运行 smoke 前 export，便于与文档/其他终端对齐（不改变已启动进程的 env）：
@@ -55,16 +56,18 @@ COMPLETION=$(curl -sS "http://127.0.0.1:8082/api/v1/profile/me/completion" \
   -H "Authorization: Bearer $TOKEN")
 echo "$COMPLETION" | jq .
 
-echo "== Phase A: structured projection assertions =="
-# 断言“结构化投影已出现”与 completion 维度口径自洽，避免把当前启发式细节（如精确分数）冻结进 smoke。
+echo "== Phase A/B: structured projection + traceability assertions =="
+# 断言结构化投影已出现、completion 维度自洽；Phase B 断言不绑定具体 fact 文案。
 echo "$PROFILE" | jq -e '
   (."facts" | type == "array") and (."facts" | length > 0) and
-  (."traits" | type == "object") and
+  (."traits" | type == "object") and (.traits | has("location_label")) and
   (."traits".interest_tags | type == "array") and (."traits".interest_tags | length > 0) and
   (."traits".connection_goal_tags | type == "array") and (."traits".connection_goal_tags | length > 0) and
   (."traits".communication_preferences | type == "array") and (."traits".communication_preferences | length > 0) and
-  (."facts" | map(.fact_type) | unique | length) >= 1
-' >/dev/null || { echo "smoke failed: profile/me missing Phase A structured fields or empty traits axis" >&2; exit 1; }
+  (."facts" | map(.fact_type) | unique | length) >= 1 and
+  (any(.facts[]; (.source_memory_id | type == "string") and (.source_memory_id | length > 0))) and
+  (all(.facts[]; (.confidence | type == "number") and .confidence >= 0 and .confidence <= 1))
+' >/dev/null || { echo "smoke failed: profile/me missing structured fields, traceability, or confidence range (see CHAT_MEMORY_PROFILE_SLICE.md)" >&2; exit 1; }
 
 echo "$COMPLETION" | jq -e '
   (.required_dimensions | sort) ==

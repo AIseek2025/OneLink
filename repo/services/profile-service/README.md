@@ -3,6 +3,15 @@
 ## 服务职责
 资料、被找设置、关注关系；**唯一**拥有全部 `profile_*` 与 `follows` 写路径。
 
+## 结构化画像投影 Phase A + Phase B（当前纵切面）
+
+- **不是**完整画像引擎：无独立问卷链、无向量索引、无持久库；**in-memory** `HashMap` + **启发式**事实映射（`src/projection.rs`）。
+- **事实层** `facts[]`：除 `fact_type`、`value` 外，Phase B 为每条事实写入 **`confidence`**（0~1 规则档位，**非**模型校准分）、**`source_memory_id`**（对齐 `context` `memory/resolve` 的 `memory_id`）；**`source_message_id`** 仅在上游记忆行非空时透传。以上为 **最小可信度/溯源**，不是完整 provenance / 审计产品。
+- **trait 聚合** `traits`：`communication_preferences` **仅**来自显式 `communication_preference` 事实（**不**再把泛化 `preference_polarity` 包装成沟通偏好）；`location_label` 无值时为 JSON **`null`**，但键始终存在（见 OpenAPI）。
+- **完成度** `GET /api/v1/profile/me/completion` 仍为 **五维**结构化覆盖率（维度集合与 Phase A 一致）。
+- **`headline` / `bio`** 由事实与 traits **派生**（展示层）；**不作为** completion 主维度。
+- **内部**仍维护 `memory_highlights` 以辅助派生，**当前**不随 `GET /me` JSON 暴露（与 `profile-service.yaml` 一致）。
+
 ## 拥有的数据
 `profiles`, `discovery_preferences`, `follows`, `profile_facts`, `profile_fact_revisions`, `profile_traits`, `trait_supporting_facts`, `profile_embeddings`, `profile_summaries`。
 

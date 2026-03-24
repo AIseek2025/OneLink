@@ -144,7 +144,7 @@
 ### 3.1 GET /api/v1/profile/me
 - **作用**：获取个人主页
 - **鉴权**：必需
-- **响应体**：
+- **响应体**（**Phase A + Phase B 纵切面**：与 `repo/platform/contracts/openapi/profile-service.yaml` 一致）：
 ```json
 {
   "user_id": "uuid",
@@ -156,9 +156,30 @@
   "languages": ["string"],
   "is_searchable": true,
   "allow_discovery": true,
-  "updated_at": "ISO8601"
+  "updated_at": "ISO8601",
+  "facts": [
+    {
+      "fact_type": "interest|goal|location|communication_preference",
+      "value": "string",
+      "confidence": 0.0,
+      "source_memory_id": "string",
+      "source_message_id": "string"
+    }
+  ],
+  "traits": {
+    "interest_tags": ["string"],
+    "connection_goal_tags": ["string"],
+    "location_label": "string|null",
+    "communication_preferences": ["string"]
+  }
 }
 ```
+- **说明**：`facts[].source_message_id` 为 **可选**（仅当上游记忆行携带时出现，否则 JSON 中可整键省略）；`confidence` 为 **启发式** 0~1，非模型分；`traits.communication_preferences` **仅**来自显式 `communication_preference` 事实（**不**由 context 的泛化 `preference_polarity` 包装）。
+- **分层说明**：
+  - **`facts` / `traits`**：事实层与聚合层（MVP 启发式 + in-memory）；Phase B 事实层带最小可信度与 `memory_id` 溯源。
+  - **`headline` / `bio`**：可由上者派生的展示层；**不作为**完成度主计分依据。
+  - **`memory_highlights`**：当前实现中用于内部派生/存储，**不**随 `GET /me` 返回；与 OpenAPI `profile-service.yaml` 一致。若未来暴露，需单独改实现与契约。
+  - **`display_name`**：当前按真实资料值返回；新用户可为空串，不再注入仅用于展示的默认占位文案，以保持与 completion “是否已填写”口径一致。
 
 ### 3.2 PATCH /api/v1/profile/me
 - **作用**：更新个人主页
@@ -200,15 +221,22 @@
 ### 3.5 GET /api/v1/profile/me/completion
 - **作用**：获取画像完成度
 - **鉴权**：必需
-- **响应体**：
+- **响应体**（**Phase A**：按结构化维度计分；与实现一致）：
 ```json
 {
-  "completion_rate": 0.65,
-  "required_dimensions": ["occupation", "skills", "..."],
-  "filled_dimensions": ["occupation", "skills"],
-  "missing_dimensions": ["goals"]
+  "completion_rate": 0.6,
+  "required_dimensions": [
+    "display_name",
+    "interest_tags",
+    "connection_goals",
+    "current_location",
+    "communication_preferences"
+  ],
+  "filled_dimensions": ["interest_tags", "connection_goals", "communication_preferences"],
+  "missing_dimensions": ["display_name", "current_location"]
 }
 ```
+- **说明**：`completion_rate = |filled ∩ required| / |required|`，再按实现做两位小数舍入；**不再**以 `headline`/`bio`/「chat 记忆摘要行是否非空」为主维度。数组顺序不保证稳定，集成断言应对 `required_dimensions` 排序后比较。示例中的 `0.6` 仅表示当前固定样本下的一个可能结果，**不应**被 smoke/CI 当作长期冻结常数。
 
 ### 3.6 GET /api/v1/profile/me/follows
 - **作用**：查看关注列表
