@@ -351,10 +351,31 @@ cargo run -p onelink-migration-runner -- "$DATABASE_URL"
   - 补齐 `/questions/answers`
   - 补齐 `/profile/:id`
   - 补齐 `PATCH /profile/me`
+- 最后一轮剩余 `profile` 接口修复：
+  - 根因不是 `app-server` 页面桥接本身，而是 `bff` 动态路由写法导致 `GET /api/v1/bff/profile/{user_id}` 未命中
+  - 将 `bff` 的 `profile/:userId` 与 `dm/threads/:threadId` 动态路由统一修正为当前运行时可匹配写法
+  - 复验后 `GET /api/v1/bff/profile/{user_id}` 已从 `404` 恢复为 `200`
 - Web 会话处理修复：
   - 不再假设 token 为 JWT
   - 改为持久化 `onelink_user_id`
   - 移除 `profile/auth/analytics` 中对 `atob` 的依赖
+- ECS 构建补充说明：
+  - 当前共享 ECS 上 `bff` 的 release 重编需使用 `CC=clang CXX=clang++`
+  - 原因是系统默认 `gcc 10.2.1` 会触发 `aws-lc-sys` 的编译器 bug 检测
+- AI 聊天真实模型接入：
+  - `model-gateway` 已从本地 skeleton/mock 回复切换为真实 `DeepSeek` 调用
+  - 当前生产模型为 `deepseek-v4-flash`
+  - `ai-chat-service -> model-gateway` 已补齐内部鉴权头，避免内部调用被 `401` 拦截
+- 记忆链路启用：
+  - `context-service` 继续作为聊天上下文与记忆构建入口
+  - 当前生产链路已验证同一会话内前一条偏好可被后一条消息引用
+- AI 服务部署补充说明：
+  - 共享环境文件 `/opt/onelink/shared/onelink.env` 已写入 `DEEPSEEK_BASE_URL`
+  - 已写入 `DEEPSEEK_MODEL=deepseek-v4-flash`
+  - 已写入 `DEEPSEEK_THINKING_TYPE=disabled`
+  - 已写入 `DEEPSEEK_TIMEOUT_MS=60000`
+  - 已写入 `DEEPSEEK_API_KEY`
+  - 本轮仅重编并重启 `onelink@model-gateway.service` 与 `onelink@ai-chat-service.service`
 
 ### 12.3 线上实测结果
 
@@ -368,6 +389,20 @@ cargo run -p onelink-migration-runner -- "$DATABASE_URL"
   - 画像页加载成功
 - `https://onelink.cool/questionnaire`
   - 问卷页加载成功
+- API 级 smoke：
+  - 注册后 `home=200`
+  - `chat_init=200`
+  - `onboarding=200`
+  - `profile/{user_id}=200`
+- AI 聊天真实模型 smoke：
+  - 注册测试用户后 `chat/messages=200`
+  - 第一轮回复已返回真实模型标识：`[chat.respond:deepseek-v4-flash]`
+  - 示例回复：
+    - `你好小明！我是 Lumi，很高兴认识你。徒步和咖啡，真是很棒的组合呢！`
+- 记忆链路 smoke：
+  - 第一轮输入：`我喜欢徒步和咖啡。请记住这个偏好。`
+  - 第二轮输入：`你还记得我刚才说我喜欢什么吗？`
+  - 第二轮回复可正确回忆：`你刚才说喜欢徒步和咖啡`
 
 ### 12.4 共享 ECS 隔离结论
 

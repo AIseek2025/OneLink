@@ -247,6 +247,7 @@ fn model_gateway_test_state() -> std::sync::Arc<model_gateway::http::routes::Gat
 
     std::sync::Arc::new(GatewayState {
         config: Config::from_env(),
+        http_client: reqwest::Client::new(),
         bulkheads: CapabilityBulkheads::with_defaults(),
         circuit_breakers: CircuitBreakerRegistry::with_default_capabilities(),
         budget_tracker: TokenBudgetTracker::with_default_capabilities(),

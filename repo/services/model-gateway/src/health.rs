@@ -78,6 +78,7 @@ mod tests {
     fn test_gateway_state() -> Arc<GatewayState> {
         Arc::new(GatewayState {
             config: Config::from_env(),
+            http_client: reqwest::Client::new(),
             bulkheads: CapabilityBulkheads::with_defaults(),
             circuit_breakers: CircuitBreakerRegistry::with_default_capabilities(),
             budget_tracker: TokenBudgetTracker::with_default_capabilities(),

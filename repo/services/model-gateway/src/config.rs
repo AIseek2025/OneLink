@@ -9,6 +9,11 @@ pub struct Config {
     pub internal_shared_secret: String,
     pub env_mode: String,
     pub internal_bind_addr: String,
+    pub deepseek_base_url: String,
+    pub deepseek_api_key: Option<String>,
+    pub deepseek_model: String,
+    pub deepseek_timeout_ms: u64,
+    pub deepseek_thinking_type: String,
 }
 
 fn internal_shared_secret_from_env() -> String {
@@ -38,11 +43,31 @@ impl Config {
         let env_mode = env_mode_from_env();
         let internal_bind_addr =
             env::var("INTERNAL_BIND_ADDR").unwrap_or_else(|_| "127.0.0.1".to_string());
+        let deepseek_base_url = env::var("DEEPSEEK_BASE_URL")
+            .unwrap_or_else(|_| "https://api.deepseek.com".to_string());
+        let deepseek_api_key = env::var("DEEPSEEK_API_KEY")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
+        let deepseek_model =
+            env::var("DEEPSEEK_MODEL").unwrap_or_else(|_| "deepseek-v4-flash".to_string());
+        let deepseek_timeout_ms = env::var("DEEPSEEK_TIMEOUT_MS")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(60_000);
+        let deepseek_thinking_type = env::var("DEEPSEEK_THINKING_TYPE")
+            .unwrap_or_else(|_| "disabled".to_string())
+            .to_lowercase();
         Self {
             port,
             internal_shared_secret,
             env_mode,
             internal_bind_addr,
+            deepseek_base_url,
+            deepseek_api_key,
+            deepseek_model,
+            deepseek_timeout_ms,
+            deepseek_thinking_type,
         }
     }
 }

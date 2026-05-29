@@ -857,6 +857,10 @@ impl AppState {
                 "{}/internal/v1/invoke",
                 self.config.model_gateway_base_url
             ))
+            .header(
+                INTERNAL_TOKEN_HEADER,
+                self.config.internal_shared_secret.as_str(),
+            )
             .json(&serde_json::json!({
                 "capability_name": "chat.respond",
                 "trace_id": trace_id,

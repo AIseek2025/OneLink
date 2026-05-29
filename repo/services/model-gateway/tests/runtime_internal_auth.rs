@@ -23,12 +23,18 @@ fn test_config() -> Config {
         internal_shared_secret: "test-internal-secret-at-least-32-chars!!".to_string(),
         env_mode: "dev".to_string(),
         internal_bind_addr: "127.0.0.1".to_string(),
+        deepseek_base_url: "http://127.0.0.1:9".to_string(),
+        deepseek_api_key: None,
+        deepseek_model: "deepseek-v4-flash".to_string(),
+        deepseek_timeout_ms: 1_000,
+        deepseek_thinking_type: "disabled".to_string(),
     }
 }
 
 fn test_state() -> Arc<GatewayState> {
     Arc::new(GatewayState {
         config: test_config(),
+        http_client: reqwest::Client::new(),
         bulkheads: CapabilityBulkheads::with_defaults(),
         circuit_breakers: CircuitBreakerRegistry::with_default_capabilities(),
         budget_tracker: TokenBudgetTracker::with_default_capabilities(),
@@ -142,6 +148,7 @@ async fn invoke_returns_fallback_when_budget_exceeded() {
     )]);
     let state = Arc::new(GatewayState {
         config: test_config(),
+        http_client: reqwest::Client::new(),
         bulkheads: CapabilityBulkheads::with_defaults(),
         circuit_breakers: CircuitBreakerRegistry::with_default_capabilities(),
         budget_tracker,

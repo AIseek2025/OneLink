@@ -45,6 +45,9 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let state = Arc::new(http::routes::GatewayState {
         config: config.clone(),
+        http_client: reqwest::Client::builder()
+            .timeout(std::time::Duration::from_millis(config.deepseek_timeout_ms))
+            .build()?,
         bulkheads: CapabilityBulkheads::with_defaults(),
         circuit_breakers: CircuitBreakerRegistry::with_default_capabilities(),
         budget_tracker: TokenBudgetTracker::with_default_capabilities(),
