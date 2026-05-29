@@ -1,0 +1,1248 @@
+openapi: 3.0.3
+info:
+  title: OneLink BFF
+  description: |
+    BFF 聚合层（App/Web 面向接口）— **Phase 2 冻结版**。
+
+    **已实现端点**：
+    - `POST /api/v1/bff/auth/register` — 注册代理（identity-service）
+    - `POST /api/v1/bff/auth/login` — 登录代理（identity-service）
+    - `GET /api/v1/bff/chat/init` — 聊天页初始化
+    - `POST /api/v1/bff/chat/messages` — 聊天消息发送代理（ai-chat-service）
+    - `GET /api/v1/bff/onboarding` — 冷启动问卷聚合
+    - `GET /api/v1/bff/home` — 首页聚合
+    - `GET /api/v1/bff/profile/{userId}` — 用户画像
+    - `PATCH /api/v1/bff/profile/me` — 用户画像编辑（代理至 profile-service）
+    - `POST /api/v1/bff/find/intent` — 找人意图壳（Phase 2 shell，写入意图后返回 202）
+    - `POST /api/v1/bff/analytics/events` — 客户端埋点事件接收（fire-and-forget，返回 202）
+    - `POST /api/v1/bff/questions/answers` — 问卷回答代理（question-service）
+
+    **占位端点（Phase 3 实现）**：
+    - ~~`GET /api/v1/bff/find/results`~~ — 已实现（Phase 3）
+    - ~~`GET /api/v1/bff/dm/list`~~ — 已实现（Phase 3）
+
+    **Phase 3 新增端点**：
+    - `GET /api/v1/bff/find/results` — 找人结果（代理至 match-service）
+    - `GET /api/v1/bff/dm/list` — 私信列表（代理至 dm-service）
+    - `POST /api/v1/bff/dm/send` — 发送私信（含安全审查）
+    - `POST /api/v1/bff/safety/report` — 举报用户
+    - `POST /api/v1/bff/safety/block` — 拉黑用户
+
+    BFF **不解析** token 语义，仅 **透传** `Authorization` 至下游服务。
+    默认端口 **8083**。
+
+    ## 鉴权
+    所有 `/api/v1/bff/*` 端点需要 Bearer token（通过 `Authorization` 头透传至 identity-service），
+    除 `/api/v1/bff/auth/register` 和 `/api/v1/bff/auth/login` 外。
+
+    ## 降级策略
+    - question-service 不可达时，`pending_questions` 降级为 `[]`
+    - profile-service 不可达时，`profile` 降级为 `null`
+    - identity-service 不可达时，返回 `401` 或 `502`
+
+    ## 冻结声明
+    本 OpenAPI 自 `1.1.0` 起冻结面向 App/Web 的公开端点集合与 schema 结构。
+    新增端点须走版本升级；已有端点的 request/response schema 不允许破坏性变更。
+    `1.2.0` 新增 `PATCH /api/v1/bff/profile/me` 端点（非破坏性新增）。
+    `1.3.0` 新增 `POST /api/v1/bff/analytics/events` 端点（非破坏性新增）。
+    `1.4.0` 实现 Phase 3 端点：`GET /api/v1/bff/find/results`、`GET /api/v1/bff/dm/list`、`POST /api/v1/bff/dm/send`、`POST /api/v1/bff/safety/report`、`POST /api/v1/bff/safety/block`（非破坏性新增）。
+    `1.5.0` 新增 `POST /api/v1/bff/auth/register`、`POST /api/v1/bff/auth/login`、`POST /api/v1/bff/questions/answers`、`POST /api/v1/bff/chat/messages` 端点（非破坏性新增）。
+    `1.6.0` Phase 6: 新增 `content_language`、`notification_language` 到 UserSummary；新增 I18NConfig、DataResidencyDecision、CompliancePolicySummary schema（非破坏性新增）。
+    `1.7.0` Phase 7: 冻结 analytics event catalog（45 events A0-A4）、新增 A3 DM/Safety 和 A4 Locale/DataRights 端点代理、`event_name` enum 写入 AnalyticsEvent schema（非破坏性新增）。
+  version: 1.7.0
+  contact:
+    name: OneLink Team
+servers:
+  - url: http://127.0.0.1:8083
+    description: 本地默认（bff）
+paths:
+  /api/v1/bff/auth/register:
+    post:
+      summary: 用户注册代理
+      operationId: bffAuthRegister
+      tags:
+        - Auth
+      description: |
+        代理至 identity-service POST /api/v1/identity/register。
+        不需要 Bearer auth。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRegisterRequest'
+      responses:
+        '200':
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: 参数错误
+        '409':
+          description: 已注册
+        '502':
+          description: identity-service 不可用
+  /api/v1/bff/auth/login:
+    post:
+      summary: 用户登录代理
+      operationId: bffAuthLogin
+      tags:
+        - Auth
+      description: |
+        代理至 identity-service POST /api/v1/identity/login。
+        不需要 Bearer auth。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthLoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: 参数错误
+        '401':
+          description: 凭证无效
+        '502':
+          description: identity-service 不可用
+  /api/v1/bff/chat/init:
+    get:
+      summary: AI 聊天页初始化
+      operationId: bffChatInit
+      tags:
+        - Chat
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: identity.me + getOrCreateConversation + pending_questions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatInitResponse'
+        '401':
+          description: 未认证或上游 identity 拒绝
+        '502':
+          description: 上游 ai-chat 或 identity 不可用
+  /api/v1/bff/chat/messages:
+    post:
+      summary: 聊天消息发送代理
+      operationId: bffChatMessages
+      tags:
+        - Chat
+      security:
+        - bearerAuth: []
+      description: |
+        代理至 ai-chat-service POST /api/v1/chat/conversations/{id}/messages。
+        需要 Bearer auth。先验证 identity，再透传消息至 ai-chat-service。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatMessageRequest'
+      responses:
+        '200':
+          description: 消息已发送，包含 AI 回复
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: 参数错误
+        '401':
+          description: 未认证
+        '502':
+          description: ai-chat-service 不可用
+  /api/v1/bff/onboarding:
+    get:
+      summary: 冷启动问卷聚合（无会话）
+      operationId: bffOnboarding
+      tags:
+        - Onboarding
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: user + pending_questions + questionnaire-domain progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingResponse'
+        '401':
+          description: 未认证或上游 identity 拒绝
+        '502':
+          description: identity-service 不可用
+  /api/v1/bff/home:
+    get:
+      summary: 首页聚合
+      operationId: bffHome
+      tags:
+        - Home
+      security:
+        - bearerAuth: []
+      description: |
+        聚合 identity.me + profile.me + profile.completion。
+        profile-service 不可达时 profile 降级为 null，completion 降级为 null。
+      responses:
+        '200':
+          description: 首页聚合数据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomeResponse'
+        '401':
+          description: 未认证
+        '502':
+          description: identity-service 不可用
+  /api/v1/bff/profile/{userId}:
+    get:
+      summary: 用户画像查看
+      operationId: bffProfile
+      tags:
+        - Profile
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      description: |
+        聚合 identity.me + profile.me。
+        仅支持查看自己的画像（userId 须与 token 对应的用户一致）。
+      responses:
+        '200':
+          description: 用户画像聚合数据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileResponse'
+        '401':
+          description: 未认证
+        '403':
+          description: 无权查看该用户画像
+        '502':
+          description: 上游服务不可用
+  /api/v1/bff/profile/me:
+    patch:
+      summary: 用户画像编辑（代理至 profile-service）
+      operationId: bffProfileMePatch
+      tags:
+        - Profile
+      security:
+        - bearerAuth: []
+      description: |
+        代理 PATCH /api/v1/profile/me 至 profile-service。
+        先验证 identity，再透传请求体至 profile-service。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileMePatchRequest'
+      responses:
+        '200':
+          description: 画像更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileSummary'
+        '401':
+          description: 未认证
+        '502':
+          description: profile-service 不可用
+  /api/v1/bff/find/intent:
+    post:
+      summary: 找人意图提交（Phase 2 shell）
+      operationId: bffFindIntent
+      tags:
+        - Find
+      security:
+        - bearerAuth: []
+      description: |
+        接收用户找人意图描述，写入 match-service 的 find-request（当前为 shell：
+        验证身份后返回 202 + find_request_id，实际匹配逻辑在 Phase 3 实现）。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FindIntentRequest'
+      responses:
+        '202':
+          description: 意图已接受，返回 find_request_id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FindIntentResponse'
+        '401':
+          description: 未认证
+        '502':
+          description: identity-service 不可用
+  /api/v1/bff/find/results:
+    get:
+      summary: 找人结果
+      operationId: bffFindResults
+      tags:
+        - Find
+      security:
+        - bearerAuth: []
+      description: |
+        代理至 match-service 获取候选推荐列表。
+        identity-service 不可达时返回 401，match-service 不可达时降级返回空列表。
+      responses:
+        '200':
+          description: 找人结果
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          description: 未认证
+  /api/v1/bff/analytics/events:
+    post:
+      summary: 客户端埋点事件接收
+      operationId: bffAnalyticsEvents
+      tags:
+        - Analytics
+      security:
+        - bearerAuth: []
+      description: |
+        接收客户端埋点事件（单个或批量），服务端记录日志后返回 202。
+        需要 Bearer auth。服务端从 identity-service 验证 token 后注入 `user_id`，
+        覆盖客户端 payload 中的 `user_id`，防止伪造。
+        BFF 不持久化事件，仅关闭客户端→服务端闭环。
+        实际事件持久化与下游处理由 data-platform 负责。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/AnalyticsEvent'
+                - type: array
+                  items:
+                    $ref: '#/components/schemas/AnalyticsEvent'
+                  maxItems: 50
+      responses:
+        '202':
+          description: 事件已接收
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accepted:
+                    type: integer
+                    description: 接收的事件数量
+                  status:
+                    type: string
+                    enum: [logged]
+  /api/v1/bff/questions/answers:
+    post:
+      summary: 问卷回答代理
+      operationId: bffQuestionAnswer
+      tags:
+        - Questionnaire
+      security:
+        - bearerAuth: []
+      description: |
+        代理至 question-service POST /api/v1/questions/answers。
+        需要 Bearer auth。先验证 identity，再透传回答至 question-service。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionAnswerRequest'
+      responses:
+        '200':
+          description: 回答已提交
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          description: 未认证
+        '502':
+          description: question-service 不可用
+  /api/v1/bff/dm/list:
+    get:
+      summary: 私信列表
+      operationId: bffDmList
+      tags:
+        - DM
+      security:
+        - bearerAuth: []
+      description: |
+        代理至 dm-service 获取用户私信线程列表。
+        identity-service 不可达时返回 401，dm-service 不可达时降级返回空列表。
+      responses:
+        '200':
+          description: 私信线程列表
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          description: 未认证
+  /api/v1/bff/dm/send:
+    post:
+      summary: 发送私信
+      operationId: bffDmSend
+      tags:
+        - DM
+      security:
+        - bearerAuth: []
+      description: |
+        创建或获取私信线程，对陌生人首条消息进行安全审查（safety-service），
+        审查通过后发送消息至 dm-service。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DmSendRequest'
+      responses:
+        '200':
+          description: 消息已发送
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DmSendResponse'
+        '400':
+          description: 参数错误
+        '401':
+          description: 未认证
+        '403':
+          description: 消息被安全审查拦截
+  /api/v1/bff/safety/report:
+    post:
+      summary: 举报用户
+      operationId: bffSafetyReport
+      tags:
+        - Safety
+      security:
+        - bearerAuth: []
+      description: |
+        代理至 safety-service 创建举报。需要 Bearer auth。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SafetyReportRequest'
+      responses:
+        '200':
+          description: 举报已创建
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SafetyReportResponse'
+        '401':
+          description: 未认证
+  /api/v1/bff/safety/block:
+    post:
+      summary: 拉黑用户
+      operationId: bffSafetyBlock
+      tags:
+        - Safety
+      security:
+        - bearerAuth: []
+      description: |
+        代理至 safety-service 拉黑用户。需要 Bearer auth。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SafetyBlockRequest'
+      responses:
+        '200':
+          description: 拉黑成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SafetyBlockResponse'
+        '401':
+          description: 未认证
+        '409':
+          description: 已拉黑
+  /api/v1/bff/dm/threads/draft:
+    post:
+      summary: DM 草稿创建
+      operationId: bffDmThreadDraft
+      tags:
+        - DM
+      security:
+        - bearerAuth: []
+      description: |
+        A3 端点。为推荐对象创建 DM 草稿，返回 thread_id 和初始状态。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recommendation_id, initial_message]
+              properties:
+                recommendation_id:
+                  type: string
+                  format: uuid
+                initial_message:
+                  type: string
+      responses:
+        '200':
+          description: 草稿已创建
+        '401':
+          description: 未认证
+  /api/v1/bff/dm/threads/first-message:
+    post:
+      summary: DM 首条消息提交
+      operationId: bffDmFirstMessage
+      tags:
+        - DM
+      security:
+        - bearerAuth: []
+      description: |
+        A3 端点。提交 DM 首条消息，经 safety-service 审查后发送。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [thread_id, message]
+              properties:
+                thread_id:
+                  type: string
+                  format: uuid
+                message:
+                  type: string
+      responses:
+        '200':
+          description: 首条消息已提交
+        '401':
+          description: 未认证
+        '403':
+          description: 安全审查拦截
+  /api/v1/bff/dm/threads/{threadId}:
+    get:
+      summary: DM 线程详情
+      operationId: bffDmThreadDetail
+      tags:
+        - DM
+      security:
+        - bearerAuth: []
+      description: A3 端点。获取 DM 线程详情及消息列表。
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: DM 线程详情
+        '401':
+          description: 未认证
+  /api/v1/bff/safety/appeals/{appealId}:
+    get:
+      summary: 申诉状态查询
+      operationId: bffSafetyAppeal
+      tags:
+        - Safety
+      security:
+        - bearerAuth: []
+      description: A3 端点。查询申诉处理状态。
+      parameters:
+        - name: appealId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 申诉状态
+        '401':
+          description: 未认证
+  /api/v1/bff/settings/locale:
+    get:
+      summary: 可用区域/语言列表
+      operationId: bffSettingsLocale
+      tags:
+        - Settings
+      security:
+        - bearerAuth: []
+      description: A4 端点。返回可用 locale、region、timezone 列表。
+      responses:
+        '200':
+          description: 区域和语言注册表
+  /api/v1/bff/compliance/summary:
+    get:
+      summary: 数据权利摘要
+      operationId: bffComplianceSummary
+      tags:
+        - Compliance
+      security:
+        - bearerAuth: []
+      description: A4 端点。返回用户数据权利及进行中请求摘要。
+      responses:
+        '200':
+          description: 合规摘要
+        '401':
+          description: 未认证
+  /api/v1/bff/compliance/export:
+    post:
+      summary: 请求数据导出
+      operationId: bffComplianceExport
+      tags:
+        - Compliance
+      security:
+        - bearerAuth: []
+      description: A4 端点。提交数据导出请求。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                export_format:
+                  type: string
+                  enum: [json, csv]
+      responses:
+        '200':
+          description: 导出请求已提交
+        '401':
+          description: 未认证
+  /api/v1/bff/compliance/delete:
+    post:
+      summary: 请求数据删除
+      operationId: bffComplianceDelete
+      tags:
+        - Compliance
+      security:
+        - bearerAuth: []
+      description: A4 端点。提交数据删除请求。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                scope:
+                  type: string
+      responses:
+        '200':
+          description: 删除请求已提交
+        '401':
+          description: 未认证
+  /api/v1/bff/compliance/correction:
+    post:
+      summary: 请求数据更正
+      operationId: bffComplianceCorrection
+      tags:
+        - Compliance
+      security:
+        - bearerAuth: []
+      description: A4 端点。提交数据更正请求。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                field_name:
+                  type: string
+      responses:
+        '200':
+          description: 更正请求已提交
+        '401':
+          description: 未认证
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+  schemas:
+    UserSummary:
+      type: object
+      required:
+        - user_id
+        - status
+        - primary_region
+        - primary_language
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [active, suspended, deactivated]
+        primary_region:
+          type: string
+        primary_language:
+          type: string
+        content_language:
+          type: string
+          description: 用户内容展示语言（独立于 primary_language）
+        notification_language:
+          type: string
+          description: 用户通知语言（独立于 primary_language 和 content_language）
+        timezone:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    ConversationSummary:
+      type: object
+      required:
+        - conversation_id
+        - status
+      properties:
+        conversation_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [active, archived]
+        created_at:
+          type: string
+          format: date-time
+    PendingQuestionItem:
+      type: object
+      required:
+        - delivery_id
+        - question_text
+        - question_style
+      properties:
+        delivery_id:
+          type: string
+          format: uuid
+        variant_id:
+          type: string
+          format: uuid
+        question_text:
+          type: string
+        question_style:
+          type: string
+          enum: [single_choice, multi_choice, text_input]
+        options:
+          type: array
+          items:
+            type: string
+        requirement_tier:
+          type: string
+          enum: [starter_required, profile_required, optional]
+    QuestionnaireProgress:
+      type: object
+      properties:
+        starter_required_count:
+          type: integer
+        starter_required_total:
+          type: integer
+        profile_required_count:
+          type: integer
+        profile_required_total:
+          type: integer
+        optional_count:
+          type: integer
+        can_proceed_to_find:
+          type: boolean
+        degraded:
+          type: boolean
+        reason:
+          type: string
+          enum: [invalid_json, non_success, request_failed]
+        http_status:
+          type: integer
+    ProfileSummary:
+      type: object
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        avatar_url:
+          type: string
+        headline:
+          type: string
+        bio:
+          type: string
+        city_level_location:
+          type: string
+        languages:
+          type: array
+          items:
+            type: string
+        is_searchable:
+          type: boolean
+        allow_discovery:
+          type: boolean
+        updated_at:
+          type: string
+    ProfileCompletion:
+      type: object
+      properties:
+        completion_rate:
+          type: number
+          format: double
+        required_dimensions:
+          type: array
+          items:
+            type: string
+        filled_dimensions:
+          type: array
+          items:
+            type: string
+        missing_dimensions:
+          type: array
+          items:
+            type: string
+    ChatInitResponse:
+      type: object
+      required:
+        - user
+        - conversation
+        - pending_questions
+      properties:
+        user:
+          $ref: '#/components/schemas/UserSummary'
+        conversation:
+          $ref: '#/components/schemas/ConversationSummary'
+        pending_questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PendingQuestionItem'
+    OnboardingResponse:
+      type: object
+      required:
+        - user
+        - pending_questions
+        - progress
+      properties:
+        user:
+          $ref: '#/components/schemas/UserSummary'
+        pending_questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PendingQuestionItem'
+        progress:
+          $ref: '#/components/schemas/QuestionnaireProgress'
+    HomeResponse:
+      type: object
+      required:
+        - user
+      properties:
+        user:
+          $ref: '#/components/schemas/UserSummary'
+        profile:
+          $ref: '#/components/schemas/ProfileSummary'
+          nullable: true
+        completion:
+          $ref: '#/components/schemas/ProfileCompletion'
+          nullable: true
+    ProfileResponse:
+      type: object
+      required:
+        - user
+        - profile
+      properties:
+        user:
+          $ref: '#/components/schemas/UserSummary'
+        profile:
+          $ref: '#/components/schemas/ProfileSummary'
+        completion:
+          $ref: '#/components/schemas/ProfileCompletion'
+          nullable: true
+    FindIntentRequest:
+      type: object
+      required:
+        - raw_query
+      properties:
+        raw_query:
+          type: string
+          description: 用户自然语言找人意图描述
+        intent_tags:
+          type: array
+          items:
+            type: string
+          description: 可选的结构化意图标签（如 ["cofounder", "investor"]）
+    FindIntentResponse:
+      type: object
+      required:
+        - find_request_id
+        - status
+      properties:
+        find_request_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          description: 当前固定为 "pending"，Phase 3 起扩展状态机
+    ProfileMePatchRequest:
+      type: object
+      description: |
+        画像编辑请求体，字段均为可选（partial update）。
+        透传至 profile-service PATCH /api/v1/profile/me。
+      properties:
+        display_name:
+          type: string
+          maxLength: 64
+        avatar_url:
+          type: string
+          maxLength: 512
+        city_level_location:
+          type: string
+          maxLength: 128
+        languages:
+          type: array
+          items:
+            type: string
+          maxItems: 16
+        is_searchable:
+          type: boolean
+        allow_discovery:
+          type: boolean
+    AnalyticsEvent:
+      type: object
+      required:
+        - event_name
+        - occurred_at
+      properties:
+        event_name:
+          type: string
+          description: |
+            事件名称，须为 frozen analytics event catalog 中的合法值。
+            完整 catalog 定义见 components/schemas/AnalyticsEventCatalog。
+          enum:
+            # A0 — Boot
+            - app_boot_started
+            - app_boot_finished
+            - app_boot_failed
+            # A1 — Auth / Chat / Profile / Settings
+            - login_submit
+            - login_success
+            - login_failed
+            - register_submit
+            - register_success
+            - register_failed
+            - conversation_list_view
+            - conversation_open
+            - conversation_create
+            - chat_view
+            - chat_send
+            - chat_reply_received
+            - chat_retry
+            - profile_fact_exposed
+            - profile_fact_accept
+            - profile_fact_reject
+            - profile_fact_snooze
+            - settings_view
+            - settings_section_open
+            # A2 — Find / Recommendations
+            - find_request_started
+            - find_request_submitted
+            - find_request_failed
+            - clarification_view
+            - clarification_submit
+            - recommendation_list_view
+            - recommendation_card_exposed
+            - recommendation_detail_view
+            - recommendation_explanation_view
+            - recommendation_connect_start
+            - recommendation_feedback_open
+            - recommendation_feedback_submit
+            # A3 — DM / Safety
+            - dm_first_message_submit
+            - dm_first_message_approved
+            - dm_first_message_blocked
+            - report_open
+            - report_submit
+            # A4 — Locale / Data Rights
+            - locale_setting_view
+            - locale_setting_save
+            - data_rights_view
+            - data_export_request
+            - data_delete_request
+            - data_correction_request
+        occurred_at:
+          type: string
+          format: date-time
+        session_id:
+          type: string
+        platform:
+          type: string
+          enum: [ios, android, web]
+        app_version:
+          type: string
+        screen:
+          type: string
+        user_id:
+          type: string
+          nullable: true
+        trace_id:
+          type: string
+    DmSendRequest:
+      type: object
+      required:
+        - recipient_user_id
+        - content
+      properties:
+        recipient_user_id:
+          type: string
+          format: uuid
+          description: 接收者用户 ID
+        content:
+          type: string
+          maxLength: 4096
+          description: 消息内容
+    DmSendResponse:
+      type: object
+      required:
+        - thread_id
+        - message_id
+        - safety_review_passed
+      properties:
+        thread_id:
+          type: string
+          format: uuid
+          description: 私信线程 ID
+        message_id:
+          type: string
+          format: uuid
+          description: 消息 ID
+        safety_review_passed:
+          type: boolean
+          description: 是否通过安全审查
+    SafetyReportRequest:
+      type: object
+      required:
+        - reported_user_id
+        - reason
+      properties:
+        reported_user_id:
+          type: string
+          format: uuid
+          description: 被举报用户 ID
+        reason:
+          type: string
+          enum: [harassment, spam, inappropriate_content, safety_concern, other]
+          description: 举报原因
+        description:
+          type: string
+          maxLength: 2048
+          description: 举报描述
+    SafetyReportResponse:
+      type: object
+      required:
+        - report_ticket_id
+        - status
+      properties:
+        report_ticket_id:
+          type: string
+          format: uuid
+          description: 举报工单 ID
+        status:
+          type: string
+          enum: [submitted, under_review, action_taken, dismissed]
+          description: 举报状态
+    SafetyBlockRequest:
+      type: object
+      required:
+        - blocked_user_id
+      properties:
+        blocked_user_id:
+          type: string
+          format: uuid
+          description: 被拉黑用户 ID
+    SafetyBlockResponse:
+      type: object
+      required:
+        - blocked_user_id
+        - created_at
+      properties:
+        blocked_user_id:
+          type: string
+          format: uuid
+          description: 被拉黑用户 ID
+        created_at:
+          type: string
+          format: date-time
+          description: 拉黑时间
+    AuthRegisterRequest:
+      type: object
+      required:
+        - provider
+        - primary_region
+        - primary_language
+      properties:
+        provider:
+          type: string
+          enum: [email, sms, password]
+        email:
+          type: string
+        phone:
+          type: string
+        password_hash:
+          type: string
+        verification_code:
+          type: string
+        primary_region:
+          type: string
+        primary_language:
+          type: string
+    AuthLoginRequest:
+      type: object
+      required:
+        - provider
+      properties:
+        provider:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        password_hash:
+          type: string
+        oauth_token:
+          type: string
+        verification_code:
+          type: string
+    AuthResponse:
+      type: object
+      required:
+        - user_id
+        - session
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        session:
+          type: object
+          required:
+            - token
+            - expires_at
+          properties:
+            token:
+              type: string
+            expires_at:
+              type: string
+              format: date-time
+    QuestionAnswerRequest:
+      type: object
+      required:
+        - delivery_id
+        - answer
+      properties:
+        delivery_id:
+          type: string
+          format: uuid
+        variant_id:
+          type: string
+          format: uuid
+        answer:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+    ChatMessageRequest:
+      type: object
+      required:
+        - conversation_id
+        - content_text
+      properties:
+        conversation_id:
+          type: string
+          format: uuid
+        content_type:
+          type: string
+          enum: [text, image, voice]
+          default: text
+        content_text:
+          type: string
+          maxLength: 4096
+    I18NConfig:
+      type: object
+      required:
+        - supported_locales
+        - default_locale
+      properties:
+        supported_locales:
+          type: array
+          items:
+            type: string
+          description: MVP 支持 zh-CN 和 en
+        default_locale:
+          type: string
+          description: 默认 locale（zh-CN）
+        requires_human_review_for_safety:
+          type: boolean
+          description: 高风险场景拒绝/劝导/举报/申诉/隐私说明是否需先人工审核
+    DataResidencyDecision:
+      type: object
+      required:
+        - user_region
+        - data_region
+        - model_call_region
+        - log_storage_region
+        - zones_isolated
+        - transfer_required
+        - transfer_permitted
+      properties:
+        user_region:
+          type: string
+        data_region:
+          type: string
+        model_call_region:
+          type: string
+        log_storage_region:
+          type: string
+        zones_isolated:
+          type: boolean
+        transfer_required:
+          type: boolean
+        transfer_permitted:
+          type: boolean
+    CompliancePolicySummary:
+      type: object
+      required:
+        - user_rights
+        - safety_categories
+        - unauthorized_find_person_blocked
+        - unauthorized_data_collection_blocked
+      properties:
+        user_rights:
+          type: array
+          items:
+            type: string
+            enum: [view_data, export_data, correct_data, delete_data]
+        safety_categories:
+          type: array
+          items:
+            type: string
+            enum: [minor_protection, harassment, scam, self_harm, illegal, privacy_violation]
+        unauthorized_find_person_blocked:
+          type: boolean
+        unauthorized_data_collection_blocked:
+          type: boolean

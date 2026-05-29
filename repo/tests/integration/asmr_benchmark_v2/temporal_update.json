@@ -1,0 +1,28 @@
+{
+  "suite": "Temporal & Update",
+  "setup_messages": [
+    "我之前在北京做产品",
+    "我现在在上海做AI产品",
+    "我后来改为远程办公"
+  ],
+  "cases": [
+    {
+      "id": "tu-current-city",
+      "query": "用户现在在哪个城市？",
+      "expected_contains": ["上海"],
+      "expected_candidate_route": "L1"
+    },
+    {
+      "id": "tu-past-city",
+      "query": "用户之前在哪个城市？",
+      "expected_contains": ["北京"],
+      "expected_candidate_route": "L1"
+    },
+    {
+      "id": "tu-updated-work-mode",
+      "query": "用户后来改为什么办公方式？",
+      "expected_contains": ["远程办公"],
+      "expected_candidate_route": "L1"
+    }
+  ]
+}

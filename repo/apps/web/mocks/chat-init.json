@@ -1,0 +1,22 @@
+{
+  "user": {
+    "user_id": "mock-user-001",
+    "status": "active",
+    "primary_region": "CN",
+    "primary_language": "zh"
+  },
+  "conversation": {
+    "conversation_id": "mock-conv-001",
+    "status": "active"
+  },
+  "pending_questions": [
+    {
+      "delivery_id": "mock-dq-001",
+      "question_text": "你目前最想认识哪类人？"
+    },
+    {
+      "delivery_id": "mock-dq-002",
+      "question_text": "你平时喜欢通过什么方式社交？"
+    }
+  ]
+}

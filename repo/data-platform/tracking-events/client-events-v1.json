@@ -1,0 +1,358 @@
+{
+  "$schema": "http://json-schema.org/draft/2020-12/schema",
+  "$id": "https://onelink.ai/schemas/tracking-events/v1",
+  "title": "OneLink Client Tracking Events",
+  "description": "Client-side analytics event taxonomy for App/Web. Phase 2 baseline.",
+  "definitions": {
+    "BaseEvent": {
+      "type": "object",
+      "required": ["event_name", "occurred_at", "session_id", "platform", "app_version"],
+      "properties": {
+        "event_name": { "type": "string" },
+        "occurred_at": { "type": "string", "format": "date-time" },
+        "session_id": { "type": "string" },
+        "user_id": { "type": "string", "format": "uuid" },
+        "platform": { "type": "string", "enum": ["ios", "android", "web"] },
+        "app_version": { "type": "string" },
+        "screen": { "type": "string", "description": "Current screen/route name" },
+        "trace_id": { "type": "string" }
+      }
+    },
+    "PageViewEvent": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "type": "object",
+          "properties": {
+            "event_name": { "const": "page.view" },
+            "page_name": { "type": "string" },
+            "referrer": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "RegistrationStartedEvent": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "type": "object",
+          "properties": {
+            "event_name": { "const": "registration.started" },
+            "provider": { "type": "string", "enum": ["email", "phone", "oauth"] }
+          }
+        }
+      ]
+    },
+    "RegistrationCompletedEvent": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "type": "object",
+          "required": ["user_id"],
+          "properties": {
+            "event_name": { "const": "registration.completed" },
+            "provider": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "LoginStartedEvent": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "type": "object",
+          "properties": {
+            "event_name": { "const": "login.started" },
+            "provider": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "LoginCompletedEvent": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "type": "object",
+          "required": ["user_id"],
+          "properties": {
+            "event_name": { "const": "login.completed" },
+            "provider": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "ChatMessageSentEvent": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "type": "object",
+          "required": ["user_id"],
+          "properties": {
+            "event_name": { "const": "chat.message.sent" },
+            "conversation_id": { "type": "string", "format": "uuid" },
+            "content_type": { "type": "string", "enum": ["text", "image", "voice"] }
+          }
+        }
+      ]
+    },
+    "ChatMessageReceivedEvent": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "type": "object",
+          "required": ["user_id"],
+          "properties": {
+            "event_name": { "const": "chat.message.received" },
+            "conversation_id": { "type": "string", "format": "uuid" },
+            "response_latency_ms": { "type": "integer" }
+          }
+        }
+      ]
+    },
+    "ProfileConfirmationViewedEvent": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "type": "object",
+          "required": ["user_id"],
+          "properties": {
+            "event_name": { "const": "profile.confirmation.viewed" },
+            "completion_rate": { "type": "number" },
+            "missing_dimensions": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      ]
+    },
+    "ProfileFactConfirmedEvent": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "type": "object",
+          "required": ["user_id"],
+          "properties": {
+            "event_name": { "const": "profile.fact.confirmed" },
+            "fact_type": { "type": "string" },
+            "fact_value": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "ProfileFactDismissedEvent": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "type": "object",
+          "required": ["user_id"],
+          "properties": {
+            "event_name": { "const": "profile.fact.dismissed" },
+            "fact_type": { "type": "string" },
+            "fact_value": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "FindPersonIntentSubmittedEvent": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "type": "object",
+          "required": ["user_id"],
+          "properties": {
+            "event_name": { "const": "find.intent.submitted" },
+            "query": { "type": "string" },
+            "query_length": { "type": "integer" }
+          }
+        }
+      ]
+    },
+    "RecommendationExposedEvent": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "type": "object",
+          "required": ["user_id"],
+          "properties": {
+            "event_name": { "const": "recommendation.exposed" },
+            "result_set_id": { "type": "string" },
+            "candidate_count": { "type": "integer" },
+            "position": { "type": "integer" }
+          }
+        }
+      ]
+    },
+    "DmMessageSentEvent": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "type": "object",
+          "required": ["user_id"],
+          "properties": {
+            "event_name": { "const": "dm.message.sent" },
+            "thread_id": { "type": "string" },
+            "recipient_user_id": { "type": "string", "format": "uuid" }
+          }
+        }
+      ]
+    },
+    "ReportSubmittedEvent": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "type": "object",
+          "required": ["user_id"],
+          "properties": {
+            "event_name": { "const": "report.submitted" },
+            "target_type": { "type": "string", "enum": ["user", "message", "profile"] },
+            "target_id": { "type": "string" },
+            "reason": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "RecommendationDetailViewedEvent": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "type": "object",
+          "properties": {
+            "event_name": { "const": "recommendation.detail.viewed" },
+            "recommendation_id": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "RecommendationFeedbackSubmittedEvent": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "type": "object",
+          "properties": {
+            "event_name": { "const": "recommendation.feedback.submitted" },
+            "recommendation_id": { "type": "string" },
+            "feedback_type": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "DmFirstMessageSentEvent": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "type": "object",
+          "properties": {
+            "event_name": { "const": "dm.first_message.sent" },
+            "recommendation_id": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "SafetyReportSubmittedEvent": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "type": "object",
+          "properties": {
+            "event_name": { "const": "safety.report.submitted" }
+          }
+        }
+      ]
+    },
+    "SafetyBlockSubmittedEvent": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "type": "object",
+          "properties": {
+            "event_name": { "const": "safety.block.submitted" }
+          }
+        }
+      ]
+    },
+    "SettingsSavedEvent": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "type": "object",
+          "properties": {
+            "event_name": { "const": "settings.saved" }
+          }
+        }
+      ]
+    },
+    "ComplianceExportCompletedEvent": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "type": "object",
+          "properties": {
+            "event_name": { "const": "compliance.export.completed" }
+          }
+        }
+      ]
+    },
+    "ComplianceCorrectionSubmittedEvent": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "type": "object",
+          "properties": {
+            "event_name": { "const": "compliance.correction.submitted" }
+          }
+        }
+      ]
+    },
+    "ComplianceDeletionSubmittedEvent": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "type": "object",
+          "properties": {
+            "event_name": { "const": "compliance.deletion.submitted" }
+          }
+        }
+      ]
+    },
+    "ErrorOccurredEvent": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "type": "object",
+          "properties": {
+            "event_name": { "const": "error.occurred" },
+            "error_type": { "type": "string", "enum": ["network", "auth", "validation", "runtime", "unknown"] },
+            "error_code": { "type": "string" },
+            "error_message": { "type": "string" },
+            "http_status": { "type": "integer" },
+            "stack_trace": { "type": "string" }
+          }
+        }
+      ]
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/definitions/PageViewEvent" },
+    { "$ref": "#/definitions/RegistrationStartedEvent" },
+    { "$ref": "#/definitions/RegistrationCompletedEvent" },
+    { "$ref": "#/definitions/LoginStartedEvent" },
+    { "$ref": "#/definitions/LoginCompletedEvent" },
+    { "$ref": "#/definitions/ChatMessageSentEvent" },
+    { "$ref": "#/definitions/ChatMessageReceivedEvent" },
+    { "$ref": "#/definitions/ProfileConfirmationViewedEvent" },
+    { "$ref": "#/definitions/ProfileFactConfirmedEvent" },
+    { "$ref": "#/definitions/ProfileFactDismissedEvent" },
+    { "$ref": "#/definitions/FindPersonIntentSubmittedEvent" },
+    { "$ref": "#/definitions/RecommendationExposedEvent" },
+    { "$ref": "#/definitions/RecommendationDetailViewedEvent" },
+    { "$ref": "#/definitions/RecommendationFeedbackSubmittedEvent" },
+    { "$ref": "#/definitions/DmMessageSentEvent" },
+    { "$ref": "#/definitions/DmFirstMessageSentEvent" },
+    { "$ref": "#/definitions/ReportSubmittedEvent" },
+    { "$ref": "#/definitions/SafetyReportSubmittedEvent" },
+    { "$ref": "#/definitions/SafetyBlockSubmittedEvent" },
+    { "$ref": "#/definitions/SettingsSavedEvent" },
+    { "$ref": "#/definitions/ComplianceExportCompletedEvent" },
+    { "$ref": "#/definitions/ComplianceCorrectionSubmittedEvent" },
+    { "$ref": "#/definitions/ComplianceDeletionSubmittedEvent" },
+    { "$ref": "#/definitions/ErrorOccurredEvent" }
+  ]
+}

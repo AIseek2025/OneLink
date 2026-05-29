@@ -1,0 +1,29 @@
+{
+  "user": {
+    "user_id": "mock-user-001",
+    "status": "active",
+    "primary_region": "CN"
+  },
+  "profile": {
+    "display_name": "测试用户",
+    "avatar_url": "",
+    "city_level_location": "北京",
+    "languages": ["zh", "en"],
+    "is_searchable": true,
+    "allow_discovery": true,
+    "facts": [
+      { "fact_type": "occupation", "value": "软件工程师", "confidence": 0.9 },
+      { "fact_type": "interest", "value": "AI 创业", "confidence": 0.85 }
+    ],
+    "traits": {
+      "interest_tags": ["AI", "创业", "阅读"],
+      "connection_goal_tags": ["投资人", "技术合伙人"],
+      "location_label": "北京",
+      "communication_preferences": ["文字", "语音"]
+    }
+  },
+  "completion": {
+    "completion_rate": 0.65,
+    "missing_dimensions": ["bio", "headline"]
+  }
+}

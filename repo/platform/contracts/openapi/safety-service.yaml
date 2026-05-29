@@ -1,0 +1,635 @@
+openapi: 3.0.3
+info:
+  title: OneLink safety-service
+  description: |
+    Content safety, reports, blocks, appeals, risk flags, and DM first-message review — Phase 3 implementation.
+
+    **Internal auth**: All `/api/v1/safety/*` endpoints require `x-internal-token` header.
+    Default port **8088**.
+  version: 1.1.0
+  contact:
+    name: OneLink Team
+servers:
+  - url: http://127.0.0.1:8088
+    description: 本地默认（safety-service）
+security:
+  - internalToken: []
+paths:
+  /api/v1/safety/screen-message:
+    post:
+      summary: 消息内容安全审查
+      operationId: safetyScreenMessage
+      tags:
+        - Screening
+      description: |
+        审查消息内容，检查发送者是否被接收者拉黑，以及消息内容是否触发安全规则。
+        返回 verdict（allow/flag/reject）、risk_score 及原因。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScreenMessageRequest'
+      responses:
+        '200':
+          description: 审查结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScreenMessageResponse'
+        '400':
+          description: 内容为空
+  /api/v1/safety/reports:
+    post:
+      summary: 创建举报
+      operationId: safetyCreateReport
+      tags:
+        - Reports
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReportPayload'
+      responses:
+        '200':
+          description: 举报已创建
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateReportResponse'
+        '400':
+          description: 参数错误（如举报自己）
+  /api/v1/safety/reports/{reportTicketId}:
+    get:
+      summary: 获取举报详情
+      operationId: safetyGetReport
+      tags:
+        - Reports
+      parameters:
+        - name: reportTicketId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 举报详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetReportResponse'
+        '404':
+          description: 举报不存在
+  /api/v1/safety/reports/{reportTicketId}/actions:
+    post:
+      summary: 创建举报处理动作
+      operationId: safetyCreateReportAction
+      tags:
+        - Reports
+      description: |
+        对举报执行处理动作。当动作为 temporary_suspension 或 permanent_ban 时，
+        自动创建对应的风控标记（RiskFlag）。
+      parameters:
+        - name: reportTicketId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReportActionPayload'
+      responses:
+        '200':
+          description: 处理动作已创建
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateReportActionResponse'
+        '404':
+          description: 举报不存在
+  /api/v1/safety/me/moderation:
+    get:
+      summary: 获取用户审核记录
+      operationId: safetyGetMyModeration
+      tags:
+        - Moderation
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 用户审核记录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModerationResponse'
+  /api/v1/safety/appeals:
+    post:
+      summary: 创建申诉
+      operationId: safetyCreateAppeal
+      tags:
+        - Appeals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAppealPayload'
+      responses:
+        '200':
+          description: 申诉已创建
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateAppealResponse'
+        '404':
+          description: 关联举报不存在
+  /api/v1/safety/blocks:
+    post:
+      summary: 拉黑用户
+      operationId: safetyCreateBlock
+      tags:
+        - Blocks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBlockPayload'
+      responses:
+        '200':
+          description: 拉黑成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateBlockResponse'
+        '409':
+          description: 已拉黑
+    get:
+      summary: 获取拉黑列表
+      operationId: safetyListBlocks
+      tags:
+        - Blocks
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 拉黑列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListBlocksResponse'
+  /api/v1/safety/blocks/{blockedUserId}:
+    delete:
+      summary: 取消拉黑
+      operationId: safetyDeleteBlock
+      tags:
+        - Blocks
+      parameters:
+        - name: blockedUserId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 取消拉黑成功
+        '404':
+          description: 拉黑记录不存在
+  /api/v1/safety/dm-first-message-review:
+    post:
+      summary: 陌生人首条私信安全审查
+      operationId: safetyReviewDmFirstMessage
+      tags:
+        - DMReview
+      description: |
+        检查发送者是否被接收者拉黑，以及消息内容是否触发安全规则。
+        返回 allowed=true/false 及审查原因。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewDmFirstMessagePayload'
+      responses:
+        '200':
+          description: 审查结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewDmFirstMessageResponse'
+  /api/v1/safety/risk-flags:
+    post:
+      summary: 创建风控标记
+      operationId: safetyCreateRiskFlag
+      tags:
+        - RiskControl
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRiskFlagPayload'
+      responses:
+        '200':
+          description: 风控标记已创建
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateRiskFlagResponse'
+  /api/v1/safety/risk-flags/{userId}:
+    get:
+      summary: 获取用户风控标记
+      operationId: safetyGetRiskFlags
+      tags:
+        - RiskControl
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 风控标记列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetRiskFlagsResponse'
+components:
+  securitySchemes:
+    internalToken:
+      type: apiKey
+      in: header
+      name: x-internal-token
+  schemas:
+    ScreenMessageRequest:
+      type: object
+      required:
+        - sender_user_id
+        - recipient_user_id
+        - content
+        - is_first_message
+      properties:
+        sender_user_id:
+          type: string
+          format: uuid
+        recipient_user_id:
+          type: string
+          format: uuid
+        content:
+          type: string
+        is_first_message:
+          type: boolean
+    ScreenMessageResponse:
+      type: object
+      required:
+        - verdict
+        - risk_score
+        - screening_id
+      properties:
+        verdict:
+          type: string
+          enum: [allow, flag, reject]
+        risk_score:
+          type: number
+          format: double
+        reason:
+          type: string
+          nullable: true
+        screening_id:
+          type: string
+          format: uuid
+    CreateReportPayload:
+      type: object
+      required:
+        - reporter_user_id
+        - reported_user_id
+        - reason
+      properties:
+        reporter_user_id:
+          type: string
+          format: uuid
+        reported_user_id:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          enum: [harassment, spam, inappropriate_content, safety_concern, other]
+        description:
+          type: string
+    CreateReportResponse:
+      type: object
+      required:
+        - report_ticket_id
+        - status
+      properties:
+        report_ticket_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [submitted, under_review, action_taken, dismissed]
+    GetReportResponse:
+      type: object
+      required:
+        - report_ticket_id
+        - reporter_user_id
+        - reported_user_id
+        - reason
+        - description
+        - status
+        - created_at
+      properties:
+        report_ticket_id:
+          type: string
+          format: uuid
+        reporter_user_id:
+          type: string
+          format: uuid
+        reported_user_id:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          enum: [harassment, spam, inappropriate_content, safety_concern, other]
+        description:
+          type: string
+        status:
+          type: string
+          enum: [submitted, under_review, action_taken, dismissed]
+        created_at:
+          type: string
+          format: date-time
+    CreateReportActionPayload:
+      type: object
+      required:
+        - report_ticket_id
+        - action_type
+        - actor_user_id
+      properties:
+        report_ticket_id:
+          type: string
+          format: uuid
+        action_type:
+          type: string
+          enum: [dismissed, warning_issued, temporary_suspension, permanent_ban, escalated_to_human]
+        actor_user_id:
+          type: string
+          format: uuid
+    CreateReportActionResponse:
+      type: object
+      required:
+        - action_id
+        - action_type
+      properties:
+        action_id:
+          type: string
+          format: uuid
+        action_type:
+          type: string
+          enum: [dismissed, warning_issued, temporary_suspension, permanent_ban, escalated_to_human]
+    ModerationResponse:
+      type: object
+      required:
+        - user_id
+        - entries
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModerationEntry'
+    ModerationEntry:
+      type: object
+      required:
+        - user_id
+        - action
+        - reason
+        - created_at
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+        reason:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    CreateAppealPayload:
+      type: object
+      required:
+        - report_ticket_id
+        - appellant_user_id
+        - reason
+      properties:
+        report_ticket_id:
+          type: string
+          format: uuid
+        appellant_user_id:
+          type: string
+          format: uuid
+        reason:
+          type: string
+    CreateAppealResponse:
+      type: object
+      required:
+        - appeal_id
+        - status
+      properties:
+        appeal_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [submitted, under_review, upheld, overturned]
+    CreateBlockPayload:
+      type: object
+      required:
+        - user_id
+        - blocked_user_id
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        blocked_user_id:
+          type: string
+          format: uuid
+    CreateBlockResponse:
+      type: object
+      required:
+        - blocked_user_id
+        - created_at
+      properties:
+        blocked_user_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+    ListBlocksResponse:
+      type: object
+      required:
+        - user_id
+        - blocked_users
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        blocked_users:
+          type: array
+          items:
+            $ref: '#/components/schemas/BlockRecord'
+    BlockRecord:
+      type: object
+      required:
+        - block_id
+        - blocker_user_id
+        - blocked_user_id
+        - created_at
+      properties:
+        block_id:
+          type: string
+          format: uuid
+        blocker_user_id:
+          type: string
+          format: uuid
+        blocked_user_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+    ReviewDmFirstMessagePayload:
+      type: object
+      required:
+        - sender_user_id
+        - recipient_user_id
+        - message_content
+      properties:
+        sender_user_id:
+          type: string
+          format: uuid
+        recipient_user_id:
+          type: string
+          format: uuid
+        message_content:
+          type: string
+    ReviewDmFirstMessageResponse:
+      type: object
+      required:
+        - allowed
+        - review_id
+      properties:
+        allowed:
+          type: boolean
+        reason:
+          type: string
+          nullable: true
+        review_id:
+          type: string
+          format: uuid
+    CreateRiskFlagPayload:
+      type: object
+      required:
+        - user_id
+        - flag_type
+        - source
+        - description
+        - severity
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        flag_type:
+          type: string
+          enum: [high_risk_score, multiple_reports, pattern_violation, manual_flag]
+        source:
+          type: string
+        description:
+          type: string
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+    CreateRiskFlagResponse:
+      type: object
+      required:
+        - flag_id
+        - severity
+      properties:
+        flag_id:
+          type: string
+          format: uuid
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+    GetRiskFlagsResponse:
+      type: object
+      required:
+        - user_id
+        - flags
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        flags:
+          type: array
+          items:
+            $ref: '#/components/schemas/RiskFlagRecord'
+    RiskFlagRecord:
+      type: object
+      required:
+        - flag_id
+        - user_id
+        - flag_type
+        - source
+        - description
+        - severity
+        - created_at
+      properties:
+        flag_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        flag_type:
+          type: string
+          enum: [high_risk_score, multiple_reports, pattern_violation, manual_flag]
+        source:
+          type: string
+        description:
+          type: string
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        created_at:
+          type: string
+          format: date-time

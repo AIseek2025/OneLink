@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft/2020-12/schema",
+  "$id": "https://onelink.ai/schemas/analytics/recommendation.exposed/v1",
+  "title": "AnalyticsRecommendationExposedV1",
+  "description": "Backend analytics event emitted when match recommendations are exposed to a user. Phase 2 baseline.",
+  "type": "object",
+  "required": ["event_id", "event_name", "event_version", "occurred_at", "producer", "payload", "trace_id"],
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid" },
+    "event_name": { "const": "analytics.recommendation.exposed" },
+    "event_version": { "const": "v1" },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "producer": { "type": "string", "const": "bff" },
+    "payload": {
+      "type": "object",
+      "required": ["user_id", "result_set_id", "candidate_count"],
+      "properties": {
+        "user_id": { "type": "string", "format": "uuid" },
+        "result_set_id": { "type": "string" },
+        "candidate_count": { "type": "integer", "minimum": 0 },
+        "position": { "type": "integer", "minimum": 0 },
+        "source": { "type": "string", "enum": ["graph_first", "rule_filter", "vector", "hybrid"] }
+      }
+    },
+    "trace_id": { "type": "string" },
+    "actor_user_id": { "type": "string", "format": "uuid" }
+  }
+}

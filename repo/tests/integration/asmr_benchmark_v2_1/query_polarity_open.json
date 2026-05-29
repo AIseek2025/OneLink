@@ -1,0 +1,41 @@
+{
+  "suite": "Query-side preference polarity (open vs embedded)",
+  "description": "验证 query_preference_polarity：开放式偏好问句回落 neutral，不把「喜欢什么样」误判为 query 自己在表达 positive；嵌入「是否不喜欢」时保留 negative。证据仍应命中记忆中的明确偏好表述。",
+  "setup_messages": [
+    "我现在在上海做AI产品",
+    "我不喜欢被推销式沟通",
+    "我对 AI 创业很感兴趣，希望认识投资人和技术合伙人"
+  ],
+  "cases": [
+    {
+      "id": "v21-qpref-open-喜欢什么样",
+      "query": "用户喜欢什么样的沟通方式？",
+      "expected_contains": ["不喜欢被推销式沟通"],
+      "expected_candidate_route": "L1",
+      "benchmark_v2_1": {
+        "expect_query_preference_polarity": "neutral",
+        "rationale": "含「什么样」→ 开放式问句；实现将 query 侧判为 neutral，避免与「喜欢」词根误判为 positive。"
+      }
+    },
+    {
+      "id": "v21-qpref-open-偏好什么样",
+      "query": "用户偏好什么样的沟通方式？",
+      "expected_contains": ["不喜欢被推销式沟通"],
+      "expected_candidate_route": "L1",
+      "benchmark_v2_1": {
+        "expect_query_preference_polarity": "neutral",
+        "rationale": "含「偏好」与「什么样」→ 开放式；query 侧 neutral。"
+      }
+    },
+    {
+      "id": "v21-qpref-embedded-是否不喜欢",
+      "query": "用户是否不喜欢被推销式沟通？",
+      "expected_contains": ["不喜欢被推销式沟通"],
+      "expected_candidate_route": "L1",
+      "benchmark_v2_1": {
+        "expect_query_preference_polarity": "negative",
+        "rationale": "嵌入「是否不喜欢」→ 保留 negative，可与证据 negative 做对齐加分。"
+      }
+    }
+  ]
+}

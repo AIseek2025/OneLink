@@ -1,0 +1,90 @@
+:root {
+  --ol-color-brand-primary: #4F46E5;
+  --ol-color-brand-primary-hover: #4338CA;
+  --ol-color-brand-primary-light: #EEF2FF;
+  --ol-color-brand-secondary: #7C3AED;
+  --ol-color-neutral-bg: #FFFFFF;
+  --ol-color-neutral-bg-secondary: #F9FAFB;
+  --ol-color-neutral-surface: #F3F4F6;
+  --ol-color-neutral-border: #E5E7EB;
+  --ol-color-neutral-border-focus: #6366F1;
+  --ol-color-neutral-text-primary: #111827;
+  --ol-color-neutral-text-secondary: #6B7280;
+  --ol-color-neutral-text-placeholder: #9CA3AF;
+  --ol-color-semantic-success: #059669;
+  --ol-color-semantic-success-bg: #ECFDF5;
+  --ol-color-semantic-warning: #D97706;
+  --ol-color-semantic-warning-bg: #FFFBEB;
+  --ol-color-semantic-error: #DC2626;
+  --ol-color-semantic-error-bg: #FEF2F2;
+  --ol-color-semantic-info: #2563EB;
+  --ol-color-semantic-info-bg: #EFF6FF;
+  --ol-color-chat-user-bubble: #4F46E5;
+  --ol-color-chat-user-bubble-text: #FFFFFF;
+  --ol-color-chat-ai-bubble: #F3F4F6;
+  --ol-color-chat-ai-bubble-text: #111827;
+  --ol-spacing-xs: 4px;
+  --ol-spacing-sm: 8px;
+  --ol-spacing-md: 12px;
+  --ol-spacing-lg: 16px;
+  --ol-spacing-xl: 24px;
+  --ol-spacing-2xl: 32px;
+  --ol-spacing-3xl: 48px;
+  --ol-font-family-base: 'Inter', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --ol-font-family-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --ol-font-size-xs: 12px;
+  --ol-font-size-sm: 14px;
+  --ol-font-size-base: 16px;
+  --ol-font-size-lg: 18px;
+  --ol-font-size-xl: 20px;
+  --ol-font-size-2xl: 24px;
+  --ol-font-size-3xl: 30px;
+  --ol-font-weight-normal: 400;
+  --ol-font-weight-medium: 500;
+  --ol-font-weight-semibold: 600;
+  --ol-font-weight-bold: 700;
+  --ol-line-height-tight: 1.25;
+  --ol-line-height-normal: 1.5;
+  --ol-line-height-relaxed: 1.75;
+  --ol-radius-sm: 6px;
+  --ol-radius-md: 8px;
+  --ol-radius-lg: 12px;
+  --ol-radius-xl: 16px;
+  --ol-radius-full: 9999px;
+  --ol-shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.05);
+  --ol-shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
+  --ol-shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+  --ol-z-dropdown: 1000;
+  --ol-z-sticky: 1100;
+  --ol-z-modal-backdrop: 1200;
+  --ol-z-modal: 1300;
+  --ol-z-toast: 1400;
+  --ol-motion-fast: 150ms;
+  --ol-motion-normal: 250ms;
+  --ol-motion-slow: 350ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ol-motion-fast: 0ms;
+    --ol-motion-normal: 0ms;
+    --ol-motion-slow: 0ms;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--ol-font-family-base);
+  font-size: var(--ol-font-size-base);
+  line-height: var(--ol-line-height-normal);
+  color: var(--ol-color-neutral-text-primary);
+  background-color: var(--ol-color-neutral-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

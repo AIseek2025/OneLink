@@ -1,0 +1,32 @@
+[package]
+name = "question-service"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "question-service"
+path = "src/main.rs"
+
+[lib]
+name = "question_service"
+path = "src/lib.rs"
+
+[dependencies]
+tokio = { workspace = true }
+axum = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+reqwest = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+onelink-internal-auth = { path = "../../platform/shared-libs/onelink-internal-auth" }
+onelink-event-envelope = { path = "../../platform/shared-libs/onelink-event-envelope" }
+deadpool-postgres = "0.14"
+tokio-postgres = { version = "0.7", features = ["with-uuid-1", "with-chrono-0_4", "with-serde_json-1"] }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"

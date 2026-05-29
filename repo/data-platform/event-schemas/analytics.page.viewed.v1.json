@@ -1,0 +1,24 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "analytics.event.protocol.v1",
+  "type": "object",
+  "required": ["event_name", "event_version", "occurred_at", "producer", "payload"],
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid" },
+    "event_name": { "type": "string" },
+    "event_version": { "type": "string", "const": "1" },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "producer": { "type": "string" },
+    "trace_id": { "type": "string", "format": "uuid" },
+    "actor_user_id": { "type": "string", "format": "uuid" },
+    "payload": {
+      "type": "object",
+      "properties": {
+        "page_name": { "type": "string" },
+        "referrer": { "type": "string" }
+      },
+      "required": ["page_name"]
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,429 @@
+openapi: 3.0.3
+info:
+  title: OneLink match-service
+  description: |
+    Candidate recommendation engine — Phase 3 implementation.
+
+    **Internal auth**: All `/api/v1/match/*` endpoints require `x-internal-token` header.
+    Default port **8087**.
+  version: 1.1.0
+  contact:
+    name: OneLink Team
+servers:
+  - url: http://127.0.0.1:8087
+    description: 本地默认（match-service）
+security:
+  - internalToken: []
+paths:
+  /api/v1/match/find-requests:
+    post:
+      summary: 创建找人请求并生成候选推荐
+      operationId: matchCreateFindRequest
+      tags:
+        - Match
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFindRequestPayload'
+      responses:
+        '200':
+          description: 找人请求已创建，候选已生成
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateFindRequestResponse'
+        '400':
+          description: raw_query 为空
+        '401':
+          description: 内部鉴权失败
+    get:
+      summary: 获取用户的找人请求列表
+      operationId: matchListFindRequests
+      tags:
+        - Match
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 找人请求列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListFindRequestsResponse'
+        '401':
+          description: 内部鉴权失败
+  /api/v1/match/find-requests/{findRequestId}:
+    get:
+      summary: 获取找人请求详情
+      operationId: matchGetFindRequest
+      tags:
+        - Match
+      parameters:
+        - name: findRequestId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 找人请求详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetFindRequestResponse'
+        '404':
+          description: 找人请求不存在
+  /api/v1/match/find-requests/{findRequestId}/candidates:
+    get:
+      summary: 获取候选推荐列表
+      operationId: matchGetCandidates
+      tags:
+        - Match
+      parameters:
+        - name: findRequestId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 候选推荐列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetCandidatesResponse'
+        '404':
+          description: 找人请求不存在
+  /api/v1/match/find-requests/{findRequestId}/feedback:
+    post:
+      summary: 提交候选反馈（like/pass/block）
+      operationId: matchSubmitFeedback
+      tags:
+        - Match
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitFeedbackPayload'
+      responses:
+        '200':
+          description: 反馈已提交
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitFeedbackResponse'
+  /api/v1/match/matches:
+    get:
+      summary: 获取用户的匹配列表
+      operationId: matchListMatches
+      tags:
+        - Matches
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 匹配列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListMatchesResponse'
+  /api/v1/match/matches/{matchId}:
+    get:
+      summary: 获取匹配详情
+      operationId: matchGetMatch
+      tags:
+        - Matches
+      parameters:
+        - name: matchId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 匹配详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetMatchResponse'
+        '404':
+          description: 匹配不存在
+components:
+  securitySchemes:
+    internalToken:
+      type: apiKey
+      in: header
+      name: x-internal-token
+  schemas:
+    CreateFindRequestPayload:
+      type: object
+      required:
+        - user_id
+        - raw_query
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        raw_query:
+          type: string
+          description: 用户自然语言找人意图描述
+        intent_tags:
+          type: array
+          items:
+            type: string
+          description: 可选的结构化意图标签
+    CreateFindRequestResponse:
+      type: object
+      required:
+        - find_request_id
+        - status
+      properties:
+        find_request_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, searching, completed, expired]
+    ListFindRequestsResponse:
+      type: object
+      required:
+        - find_requests
+        - candidates
+      properties:
+        find_requests:
+          type: array
+          items:
+            $ref: '#/components/schemas/FindRequestRecord'
+        candidates:
+          type: array
+          items:
+            $ref: '#/components/schemas/CandidateRecord'
+    FindRequestRecord:
+      type: object
+      required:
+        - find_request_id
+        - user_id
+        - raw_query
+        - intent_tags
+        - status
+        - created_at
+      properties:
+        find_request_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        raw_query:
+          type: string
+        intent_tags:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [pending, searching, completed, expired]
+        created_at:
+          type: string
+          format: date-time
+    GetFindRequestResponse:
+      type: object
+      required:
+        - find_request_id
+        - user_id
+        - raw_query
+        - intent_tags
+        - status
+        - created_at
+      properties:
+        find_request_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        raw_query:
+          type: string
+        intent_tags:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [pending, searching, completed, expired]
+        created_at:
+          type: string
+          format: date-time
+    GetCandidatesResponse:
+      type: object
+      required:
+        - find_request_id
+        - candidates
+      properties:
+        find_request_id:
+          type: string
+          format: uuid
+        candidates:
+          type: array
+          items:
+            $ref: '#/components/schemas/CandidateRecord'
+    CandidateRecord:
+      type: object
+      required:
+        - candidate_user_id
+        - score
+        - match_reasons
+        - status
+      properties:
+        candidate_user_id:
+          type: string
+          format: uuid
+        score:
+          type: number
+          format: double
+        match_reasons:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [suggested, liked, passed, blocked]
+    SubmitFeedbackPayload:
+      type: object
+      required:
+        - user_id
+        - candidate_user_id
+        - action
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        candidate_user_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          enum: [like, pass, block]
+    SubmitFeedbackResponse:
+      type: object
+      required:
+        - feedback_id
+        - action
+        - match_created
+      properties:
+        feedback_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          enum: [like, pass, block]
+        match_created:
+          type: boolean
+        match_id:
+          type: string
+          format: uuid
+          nullable: true
+    ListMatchesResponse:
+      type: object
+      required:
+        - matches
+      properties:
+        matches:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatchRecord'
+    GetMatchResponse:
+      type: object
+      required:
+        - match_id
+        - user_a_id
+        - user_b_id
+        - match_type
+        - status
+        - created_at
+      properties:
+        match_id:
+          type: string
+          format: uuid
+        user_a_id:
+          type: string
+          format: uuid
+        user_b_id:
+          type: string
+          format: uuid
+        match_type:
+          type: string
+          enum: [mutual_like, recommendation]
+        status:
+          type: string
+          enum: [active, unmatched, expired]
+        created_at:
+          type: string
+          format: date-time
+        mutual_like_detected_at:
+          type: string
+          format: date-time
+          nullable: true
+    MatchRecord:
+      type: object
+      required:
+        - match_id
+        - user_a_id
+        - user_b_id
+        - match_type
+        - status
+        - created_at
+      properties:
+        match_id:
+          type: string
+          format: uuid
+        user_a_id:
+          type: string
+          format: uuid
+        user_b_id:
+          type: string
+          format: uuid
+        match_type:
+          type: string
+          enum: [mutual_like, recommendation]
+        status:
+          type: string
+          enum: [active, unmatched, expired]
+        created_at:
+          type: string
+          format: date-time
+        mutual_like_detected_at:
+          type: string
+          format: date-time
+          nullable: true

@@ -1,0 +1,21 @@
+{
+  "find_request_id": "mock-find-001",
+  "candidates": [
+    {
+      "user_id": "mock-cand-001",
+      "display_name": "李明",
+      "headline": "AI 产品经理 | 关注大模型应用",
+      "city_level_location": "北京",
+      "match_score": 0.87,
+      "interest_tags": ["AI", "产品", "大模型"]
+    },
+    {
+      "user_id": "mock-cand-002",
+      "display_name": "王芳",
+      "headline": "早期投资人 | 关注科技赛道",
+      "city_level_location": "上海",
+      "match_score": 0.82,
+      "interest_tags": ["投资", "创业", "科技"]
+    }
+  ]
+}

@@ -1,0 +1,365 @@
+openapi: 3.0.3
+info:
+  title: OneLink model-gateway internal capability API
+  version: 0.3.0-draft
+  description: |
+    不对外暴露。对齐 OneLink/docs/archive/rules-legacy-2026-05-15/Rules/15-MVP-OPENAPI-DRAFT.md §10。
+    实际实现可为 gRPC；此处仅 HTTP 形状占位。
+    Phase 5 新增 capacity status endpoint 与 budget/fallback 相关字段。
+    Phase 6 新增 i18n locale hint on InvokeRequest, compliance & residency schemas。
+servers:
+  - url: http://model-gateway.internal:8080
+paths:
+  /internal/v1/invoke:
+    post:
+      summary: Invoke a named model capability with capacity controls
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvokeRequest'
+      responses:
+        '200':
+          description: Success (may include fallback response when degraded)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvokeResponse'
+  /internal/v1/capacity/status:
+    get:
+      summary: Get current capacity status including bulkheads, circuit breakers, budgets, cache and cost metrics
+      responses:
+        '200':
+          description: Capacity status snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapacityStatusResponse'
+  /internal/v1/i18n/policy:
+    get:
+      summary: Get I18N policy (supported locales, default locale, safety human review requirement)
+      responses:
+        '200':
+          description: I18N policy snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/I18NPolicy'
+  /internal/v1/i18n/translate:
+    post:
+      summary: Translate a terminology key to a given locale
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - key
+                - locale
+              properties:
+                key:
+                  type: string
+                locale:
+                  type: string
+      responses:
+        '200':
+          description: Translation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key:
+                    type: string
+                  locale:
+                    type: string
+                  text:
+                    type: string
+  /internal/v1/compliance/policy:
+    get:
+      summary: Get compliance policy summary (user rights, safety categories, blocked actions)
+      responses:
+        '200':
+          description: Compliance policy summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompliancePolicySummary'
+  /internal/v1/residency/decision:
+    post:
+      summary: Compute data residency decision for a user region
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_region
+              properties:
+                user_region:
+                  type: string
+      responses:
+        '200':
+          description: Residency decision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResidencyDecisionResponse'
+components:
+  schemas:
+    InvokeRequest:
+      type: object
+      required:
+        - capability_name
+      properties:
+        capability_name:
+          type: string
+          description: "e.g. chat.respond, match.recommend, safety.review"
+        trace_id:
+          type: string
+          format: uuid
+        estimated_tokens:
+          type: integer
+          format: uint64
+          description: Estimated token consumption for budget check
+        payload:
+          type: object
+          additionalProperties: true
+        locale_hint:
+          type: string
+          description: "Preferred locale for model response (e.g. zh-CN, en)"
+    InvokeResponse:
+      type: object
+      required:
+        - capability_name
+        - model_id
+        - output_text
+        - degraded
+      properties:
+        capability_name:
+          type: string
+        model_id:
+          type: string
+        output_text:
+          type: string
+        degraded:
+          type: boolean
+          description: True when a fallback response was returned instead of a real model invocation
+        fallback_reason:
+          type: string
+          description: Set when degraded=true; one of token_budget_exceeded, circuit_breaker_open, bulkhead_at_capacity, provider_error
+    FallbackResponse:
+      type: object
+      required:
+        - capability_name
+        - model_id
+        - output_text
+        - fallback_reason
+        - degraded
+      properties:
+        capability_name:
+          type: string
+        model_id:
+          type: string
+        output_text:
+          type: string
+        fallback_reason:
+          type: string
+        degraded:
+          type: boolean
+    CircuitBreakerStatus:
+      type: object
+      required:
+        - capability
+        - state
+        - failure_count
+        - success_count
+      properties:
+        capability:
+          type: string
+        state:
+          type: string
+          enum: [closed, open, half_open]
+        failure_count:
+          type: integer
+          format: uint64
+        success_count:
+          type: integer
+          format: uint64
+    TokenUsage:
+      type: object
+      required:
+        - capability
+        - total_tokens_consumed
+        - request_count
+        - budget_limit
+      properties:
+        capability:
+          type: string
+        total_tokens_consumed:
+          type: integer
+          format: uint64
+        request_count:
+          type: integer
+          format: uint64
+        budget_limit:
+          type: integer
+          format: uint64
+    CacheStats:
+      type: object
+      required:
+        - entry_count
+        - total_hits
+        - max_entries
+        - ttl_secs
+      properties:
+        entry_count:
+          type: integer
+        total_hits:
+          type: integer
+          format: uint64
+        max_entries:
+          type: integer
+        ttl_secs:
+          type: integer
+          format: uint64
+    CostMetricsSnapshot:
+      type: object
+      required:
+        - model_invocation
+        - cache_hit
+        - fallback_used
+        - budget_exceeded
+        - circuit_breaker_open
+        - bulkhead_rejected
+        - total_tokens_consumed
+      properties:
+        model_invocation:
+          type: integer
+          format: uint64
+        cache_hit:
+          type: integer
+          format: uint64
+        fallback_used:
+          type: integer
+          format: uint64
+        budget_exceeded:
+          type: integer
+          format: uint64
+        circuit_breaker_open:
+          type: integer
+          format: uint64
+        bulkhead_rejected:
+          type: integer
+          format: uint64
+        total_tokens_consumed:
+          type: integer
+          format: uint64
+    CapacityStatusResponse:
+      type: object
+      required:
+        - bulkheads
+        - circuit_breakers
+        - token_budgets
+        - cache
+        - cost_metrics
+      properties:
+        bulkheads:
+          type: object
+          additionalProperties:
+            type: integer
+            format: uint64
+        circuit_breakers:
+          type: array
+          items:
+            $ref: '#/components/schemas/CircuitBreakerStatus'
+        token_budgets:
+          type: array
+          items:
+            $ref: '#/components/schemas/TokenUsage'
+        cache:
+          $ref: '#/components/schemas/CacheStats'
+        cost_metrics:
+          $ref: '#/components/schemas/CostMetricsSnapshot'
+    I18NPolicy:
+      type: object
+      required:
+        - supported_locales
+        - default_locale
+        - safety_human_review_required
+      properties:
+        supported_locales:
+          type: array
+          items:
+            type: string
+        default_locale:
+          type: string
+        safety_human_review_required:
+          type: boolean
+    ResidencyConfig:
+      type: object
+      required:
+        - region_id
+        - isolated_zones
+        - degradation_mode
+      properties:
+        region_id:
+          type: string
+        isolated_zones:
+          type: array
+          items:
+            type: string
+            enum: [database, object_storage, event_log, vector_index, model_log]
+        degradation_mode:
+          type: string
+          enum: [read_only, partial_unavailable, delayed_sync, standby_region]
+    CompliancePolicySummary:
+      type: object
+      required:
+        - user_rights
+        - safety_categories
+        - unauthorized_find_person_blocked
+        - unauthorized_data_collection_blocked
+      properties:
+        user_rights:
+          type: array
+          items:
+            type: string
+            enum: [view_data, export_data, correct_data, delete_data]
+        safety_categories:
+          type: array
+          items:
+            type: string
+            enum: [minor_protection, harassment, scam, self_harm, illegal, privacy_violation]
+        unauthorized_find_person_blocked:
+          type: boolean
+        unauthorized_data_collection_blocked:
+          type: boolean
+    ResidencyDecisionResponse:
+      type: object
+      required:
+        - user_region
+        - data_region
+        - model_call_region
+        - log_storage_region
+        - zones_isolated
+        - transfer_required
+        - transfer_permitted
+      properties:
+        user_region:
+          type: string
+        data_region:
+          type: string
+        model_call_region:
+          type: string
+        log_storage_region:
+          type: string
+        zones_isolated:
+          type: boolean
+        transfer_required:
+          type: boolean
+        transfer_permitted:
+          type: boolean

@@ -1,0 +1,21 @@
+[Unit]
+Description=OneLink %i service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=admin
+Group=admin
+WorkingDirectory=/opt/onelink/current/repo
+EnvironmentFile=/opt/onelink/shared/onelink.env
+EnvironmentFile=-/opt/onelink/shared/services/%i.env
+ExecStart=/opt/onelink/current/repo/target/release/%i
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+StandardOutput=append:/var/log/onelink/%i.log
+StandardError=append:/var/log/onelink/%i.err.log
+
+[Install]
+WantedBy=multi-user.target

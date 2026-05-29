@@ -1,0 +1,13 @@
+---
+description: OneLink — 实质性工作前先读 Agent 轻量记忆清单
+alwaysApply: true
+---
+
+# 读 `docs/AGENT_MEMORY_BRIEF.md`
+
+在 **OneLink** 仓库内做实质性开发、契约修改、集成验证或架构裁决前：
+
+1. 先阅读仓库根目录下的 `docs/AGENT_MEMORY_BRIEF.md`（轻量记忆：产品主线、当前调度入口、目录与端口、冲突处理、排障指针）。
+2. 若存在完整对话导出 `docs/CURSOR_AGENT_CHAT_RESTORE.md`，在清单不足以支撑结论时，应 **在该文件中搜索或翻阅** 后再下结论，并简要说明依据来自该文件。
+3. **不要**依赖用户每次口头提醒「先读清单」；规则会尽量保证 Agent 主动加载本文要点。
+4. **`AGENT_MEMORY_BRIEF.md` 与当前代码或 `Rules/`、`Rules-V2/` 冲突时，以仓库内现行实现与权威规则文档为准**；可用导出文件核对历史说法，但交付须对齐现状。

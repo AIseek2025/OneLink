@@ -1,0 +1,15 @@
+[package]
+name = "onelink-internal-auth"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+axum = { workspace = true }
+subtle = "2"
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"

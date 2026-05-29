@@ -1,0 +1,162 @@
+name: CI Baseline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  fmt:
+    name: cargo fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check formatting
+        working-directory: repo
+        run: cargo fmt --all -- --check
+
+  clippy:
+    name: cargo clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Clippy
+        working-directory: repo
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+  test:
+    name: cargo test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run tests
+        working-directory: repo
+        run: cargo test --workspace
+        env:
+          ONELINK_ENV: dev
+
+  persistence-smoke:
+    name: persistence smoke (Postgres)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: onelink
+          POSTGRES_PASSWORD: onelink-local-dev-password
+          POSTGRES_DB: onelink
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install psql client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Apply DDL
+        env:
+          DATABASE_URL: postgres://onelink:onelink-local-dev-password@localhost:5432/onelink
+        run: |
+          DDL_DIR="repo/data-platform/db-schema/drafts"
+          DDL_ORDER=(
+            001_identity.sql
+            002_profile.sql
+            003_context.sql
+            003_context_activation.sql
+            003_context_idempotency.sql
+            011_runtime_observability.sql
+            004_ai_chat.sql
+            005_dm.sql
+            006_question.sql
+            007_match.sql
+            008_safety.sql
+            010_optimization.sql
+            009_model_gateway.sql
+          )
+          for f in "${DDL_ORDER[@]}"; do
+            echo "  applying $f"
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$DDL_DIR/$f"
+          done
+      - name: Build services
+        working-directory: repo
+        run: cargo build -p identity-service -p context-service -p profile-service
+      - name: Run persistence smoke
+        working-directory: repo
+        run: cargo test -p onelink-persistence-smoke -- --nocapture
+        env:
+          RUN_PERSISTENCE_SMOKE: 1
+          ONELINK_ENV: dev
+          INTERNAL_SHARED_SECRET: onelink-dev-internal-token
+          DATABASE_URL: postgres://onelink:onelink-local-dev-password@localhost:5432/onelink
+
+  process-level-smoke:
+    name: process-level runtime smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build services
+        working-directory: repo
+        run: cargo build -p identity-service -p context-service -p profile-service
+      - name: Run process-level tests
+        working-directory: repo
+        run: |
+          cargo test -p identity-service --test process_level_runtime -- --nocapture
+          cargo test -p context-service --test process_level_runtime -- --nocapture
+          cargo test -p profile-service --test process_level_runtime -- --nocapture
+        env:
+          RUN_PROCESS_LEVEL_SMOKE: 1
+          ONELINK_ENV: dev
+          INTERNAL_SHARED_SECRET: onelink-dev-internal-token
+
+  schema-validate:
+    name: schema validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate OpenAPI schemas
+        run: |
+          for f in repo/platform/contracts/openapi/*.yaml; do
+            echo "Validating $f"
+            python3 -c "
+          import yaml, sys
+          try:
+              yaml.safe_load(open('$f'))
+              print('  OK: valid YAML')
+          except Exception as e:
+              print(f'  FAIL: {e}')
+              sys.exit(1)
+          " || exit 1
+          done
+          echo "All OpenAPI YAML schemas valid"
+      - name: Validate event JSON schemas
+        run: |
+          for f in repo/data-platform/event-schemas/*.json; do
+            echo "Validating $f"
+            python3 -c "
+          import json, sys
+          try:
+              json.load(open('$f'))
+              print('  OK: valid JSON')
+          except Exception as e:
+              print(f'  FAIL: {e}')
+              sys.exit(1)
+          " || exit 1
+          done
+          echo "All event JSON schemas valid"

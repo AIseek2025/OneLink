@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft/2020-12/schema",
+  "$id": "https://onelink.ai/schemas/analytics/report.submitted/v1",
+  "title": "AnalyticsReportSubmittedV1",
+  "description": "Backend analytics event emitted when a user submits a safety report. Phase 2 baseline.",
+  "type": "object",
+  "required": ["event_id", "event_name", "event_version", "occurred_at", "producer", "payload", "trace_id"],
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid" },
+    "event_name": { "const": "analytics.report.submitted" },
+    "event_version": { "const": "v1" },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "producer": { "type": "string", "const": "bff" },
+    "payload": {
+      "type": "object",
+      "required": ["user_id", "target_type", "target_id", "reason"],
+      "properties": {
+        "user_id": { "type": "string", "format": "uuid" },
+        "target_type": { "type": "string", "enum": ["user", "message", "profile"] },
+        "target_id": { "type": "string" },
+        "reason": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "trace_id": { "type": "string" },
+    "actor_user_id": { "type": "string", "format": "uuid" }
+  }
+}

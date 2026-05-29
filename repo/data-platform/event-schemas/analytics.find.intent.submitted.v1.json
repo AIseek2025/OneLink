@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "analytics.find.intent.submitted.v1",
+  "type": "object",
+  "required": ["event_id", "event_name", "event_version", "occurred_at", "producer", "payload"],
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid" },
+    "event_name": { "type": "string", "const": "analytics.find.intent.submitted.v1" },
+    "event_version": { "type": "string" },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "producer": { "type": "string", "const": "web-app" },
+    "trace_id": { "type": "string", "format": "uuid" },
+    "actor_user_id": { "type": "string", "format": "uuid" },
+    "payload": {
+      "type": "object",
+      "properties": {
+        "find_request_id": { "type": "string", "format": "uuid" },
+        "raw_query": { "type": "string" },
+        "intent_tags": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["find_request_id", "raw_query"],
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

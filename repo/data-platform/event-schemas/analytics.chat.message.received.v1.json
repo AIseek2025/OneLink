@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft/2020-12/schema",
+  "$id": "https://onelink.ai/schemas/analytics/chat.message.received/v1",
+  "title": "AnalyticsChatMessageReceivedV1",
+  "description": "Backend analytics event emitted when a user receives an AI chat response. Phase 2 baseline.",
+  "type": "object",
+  "required": ["event_id", "event_name", "event_version", "occurred_at", "producer", "payload", "trace_id"],
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid" },
+    "event_name": { "const": "analytics.chat.message.received" },
+    "event_version": { "const": "v1" },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "producer": { "type": "string", "const": "bff" },
+    "payload": {
+      "type": "object",
+      "required": ["user_id", "conversation_id"],
+      "properties": {
+        "user_id": { "type": "string", "format": "uuid" },
+        "conversation_id": { "type": "string", "format": "uuid" },
+        "response_latency_ms": { "type": "integer", "minimum": 0 },
+        "content_type": { "type": "string", "enum": ["text", "image", "voice"] }
+      }
+    },
+    "trace_id": { "type": "string" },
+    "actor_user_id": { "type": "string", "format": "uuid" }
+  }
+}

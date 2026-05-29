@@ -1,0 +1,11 @@
+[package]
+name = "onelink-migration-runner"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+refinery = { version = "0.8", features = ["tokio-postgres"] }
+tokio-postgres = "0.7"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+uuid = "1"

@@ -1,0 +1,105 @@
+[package]
+name = "onelink-contract-tests"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = "0.9"
+sha2 = "0.10"
+hex = "0.4"
+onelink-internal-auth = { path = "../../platform/shared-libs/onelink-internal-auth" }
+
+[[test]]
+name = "openapi_schemas_valid"
+path = "tests/openapi_schemas_valid.rs"
+
+[[test]]
+name = "event_schemas_valid"
+path = "tests/event_schemas_valid.rs"
+
+[[test]]
+name = "internal_secret_baseline"
+path = "tests/internal_secret_baseline.rs"
+
+[[test]]
+name = "bff_internal_auth_contract"
+path = "tests/bff_internal_auth_contract.rs"
+
+[[test]]
+name = "persistence_graceful_degradation"
+path = "tests/persistence_graceful_degradation.rs"
+
+[[test]]
+name = "auth_dedup_contract"
+path = "tests/auth_dedup_contract.rs"
+
+[[test]]
+name = "ddl_schema_valid"
+path = "tests/ddl_schema_valid.rs"
+
+[[test]]
+name = "internal_network_protection"
+path = "tests/internal_network_protection.rs"
+
+[[test]]
+name = "internal_auth_enforcement"
+path = "tests/internal_auth_enforcement.rs"
+
+[[test]]
+name = "bff_no_internal_bypass"
+path = "tests/bff_no_internal_bypass.rs"
+
+[[test]]
+name = "runtime_auth_coverage"
+path = "tests/runtime_auth_coverage.rs"
+
+[[test]]
+name = "observability_auth_boundary"
+path = "tests/observability_auth_boundary.rs"
+
+[[test]]
+name = "bff_openapi_frozen"
+path = "tests/bff_openapi_frozen.rs"
+
+[[test]]
+name = "profile_patch_me_contract"
+path = "tests/profile_patch_me_contract.rs"
+
+[[test]]
+name = "phase_promotion_contract"
+path = "tests/phase_promotion_contract.rs"
+
+[[test]]
+name = "bff_app_auth_contract"
+path = "tests/bff_app_auth_contract.rs"
+
+[[test]]
+name = "phase3_match_safety_dm_contract"
+path = "tests/phase3_match_safety_dm_contract.rs"
+
+[[test]]
+name = "phase1_security_baseline_contract"
+path = "tests/phase1_security_baseline_contract.rs"
+
+[[test]]
+name = "phase1_persistence_baseline_contract"
+path = "tests/phase1_persistence_baseline_contract.rs"
+
+[[test]]
+name = "phase2_app_web_foundation_contract"
+path = "tests/phase2_app_web_foundation_contract.rs"
+
+[[test]]
+name = "persistence_readiness_contract"
+path = "tests/persistence_readiness_contract.rs"
+
+[[test]]
+name = "phase5_capacity_cost_reliability_contract"
+path = "tests/phase5_capacity_cost_reliability_contract.rs"
+
+[[test]]
+name = "phase6_global_i18n_compliance_contract"
+path = "tests/phase6_global_i18n_compliance_contract.rs"

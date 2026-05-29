@@ -1,0 +1,237 @@
+openapi: 3.0.3
+info:
+  title: OneLink ai-chat-service
+  description: |
+    AI 聊天入口（MVP / draft）。默认端口 **8085**（`PORT` 可覆盖）。
+
+    **鉴权（与实现一致）**
+    - `POST /api/v1/chat/conversations` 需 **`Authorization: Bearer <opaque token>`**（经 identity-service `GET /api/v1/identity/me` 校验）。
+    - `POST …/messages`、`GET …/messages`、`GET …/context` 需 **`Authorization: Bearer <opaque token>`**，并校验 **会话属主**（非本人 `conversation_id` 返回 403/404）。
+
+    **内部接口（不面向前端）**  
+    `context-service` 会调用 `GET /internal/chat/conversations/{id}/messages/{messageId}` 拉用户消息正文；须带 **`x-internal-token`**，与 `INTERNAL_SHARED_SECRET` 一致。  
+    **本 OpenAPI 不展开 `/internal/*` 路径**，避免误当作公开 API；细节见 `repo/services/ai-chat-service/README.md`。
+
+    **当前 MVP 边界**
+    - `idempotency_key` 字段当前仅保留作前向兼容，**实现尚不执行去重**。
+    - `created_at` / `last_message_at` 当前为固定开发态时间戳，占位用于跑通纵切面，**不代表真实消息时间**。
+  version: 0.2.0-draft
+servers:
+  - url: http://127.0.0.1:8085
+    description: 本地默认（ai-chat-service）
+paths:
+  /api/v1/chat/conversations:
+    post:
+      summary: 创建或复用当前用户主会话
+      operationId: chatCreateOrGetConversation
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConversationRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateConversationResponse'
+        '401':
+          description: 未认证或 token 无效/过期
+        '502':
+          description: identity-service 不可用
+  /api/v1/chat/conversations/{conversationId}/context:
+    get:
+      summary: 获取会话上下文摘要视图
+      operationId: chatGetContext
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetConversationContextResponse'
+        '401':
+          description: 未认证
+        '403':
+          description: 非会话属主
+        '404':
+          description: 会话不存在
+        '502':
+          description: identity-service 不可用
+  /api/v1/chat/conversations/{conversationId}/messages:
+    get:
+      summary: 列出会话消息
+      operationId: chatListMessages
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListMessagesResponse'
+        '401':
+          description: 未认证
+        '403':
+          description: 非会话属主
+        '404':
+          description: 会话不存在
+        '502':
+          description: identity-service 不可用
+    post:
+      summary: 发送用户消息并返回 AI 回复
+      operationId: chatSendMessage
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendMessageRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendMessageResponse'
+        '401':
+          description: 未认证
+        '403':
+          description: 非会话属主
+        '404':
+          description: 会话不存在
+        '502':
+          description: identity-service 不可用；context-service 或 model-gateway 失败时实现会走 200 degraded/fallback
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+  schemas:
+    CreateConversationRequest:
+      type: object
+      properties:
+        idempotency_key:
+          type: string
+          nullable: true
+          description: Accepted for forward compatibility; current MVP does not dedupe on it
+    CreateConversationResponse:
+      type: object
+      required:
+        - conversation_id
+        - status
+        - created_at
+      properties:
+        conversation_id:
+          type: string
+        status:
+          type: string
+        created_at:
+          type: string
+    SendMessageRequest:
+      type: object
+      required:
+        - content_type
+        - content_text
+      properties:
+        content_type:
+          type: string
+        content_text:
+          type: string
+        idempotency_key:
+          type: string
+          nullable: true
+          description: Accepted for forward compatibility; current MVP does not dedupe on it
+    SendMessageResponse:
+      type: object
+      required:
+        - user_message_id
+        - ai_message_id
+        - ai_content_text
+        - created_at
+      properties:
+        user_message_id:
+          type: string
+        ai_message_id:
+          type: string
+        ai_content_text:
+          type: string
+        created_at:
+          type: string
+          description: Fixed dev-only timestamp in current MVP; not a real clock value
+    MessageItem:
+      type: object
+      required:
+        - message_id
+        - sender_type
+        - content_text
+        - content_type
+        - created_at
+      properties:
+        message_id:
+          type: string
+        sender_type:
+          type: string
+        content_text:
+          type: string
+        content_type:
+          type: string
+        created_at:
+          type: string
+          description: Fixed dev-only timestamp in current MVP; not a real clock value
+    ListMessagesResponse:
+      type: object
+      required:
+        - items
+        - next_cursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageItem'
+        next_cursor:
+          type: string
+          nullable: true
+    GetConversationContextResponse:
+      type: object
+      required:
+        - context_version
+        - summary
+        - last_message_at
+      properties:
+        context_version:
+          type: integer
+          format: int64
+        summary:
+          type: string
+        last_message_at:
+          type: string
+          description: Fixed dev-only timestamp in current MVP; not a real clock value

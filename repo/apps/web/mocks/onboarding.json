@@ -1,0 +1,40 @@
+{
+  "user": {
+    "user_id": "mock-user-001",
+    "status": "active",
+    "primary_region": "CN",
+    "primary_language": "zh"
+  },
+  "pending_questions": [
+    {
+      "delivery_id": "mock-oq-001",
+      "variant_id": "v1",
+      "question_text": "你的职业领域是什么？",
+      "question_style": "single_choice",
+      "options": ["科技/互联网", "金融", "教育", "医疗", "其他"],
+      "requirement_tier": "starter_required"
+    },
+    {
+      "delivery_id": "mock-oq-002",
+      "variant_id": "v1",
+      "question_text": "你感兴趣的领域有哪些？",
+      "question_style": "multi_choice",
+      "options": ["AI/机器学习", "区块链", "生物科技", "新能源", "消费", "企业服务"],
+      "requirement_tier": "profile_required"
+    },
+    {
+      "delivery_id": "mock-oq-003",
+      "question_text": "简单介绍你自己",
+      "question_style": "text_input",
+      "requirement_tier": "optional"
+    }
+  ],
+  "progress": {
+    "starter_required_count": 0,
+    "starter_required_total": 1,
+    "profile_required_count": 0,
+    "profile_required_total": 1,
+    "optional_count": 0,
+    "can_proceed_to_find": false
+  }
+}

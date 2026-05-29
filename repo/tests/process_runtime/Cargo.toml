@@ -1,0 +1,11 @@
+[package]
+name = "onelink-process-runtime"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+
+[[test]]
+name = "process_runtime"
+path = "tests/process_runtime.rs"

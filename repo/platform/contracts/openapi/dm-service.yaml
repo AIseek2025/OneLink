@@ -1,0 +1,438 @@
+openapi: 3.0.3
+info:
+  title: OneLink dm-service
+  description: |
+    Direct messaging threads and messages — Phase 3 implementation.
+
+    **Internal auth**: All `/api/v1/dm/*` endpoints require `x-internal-token` header.
+    Default port **8089**.
+  version: 1.1.0
+  contact:
+    name: OneLink Team
+servers:
+  - url: http://127.0.0.1:8089
+    description: 本地默认（dm-service）
+security:
+  - internalToken: []
+paths:
+  /api/v1/dm/threads:
+    get:
+      summary: 获取用户私信线程列表
+      operationId: dmListThreads
+      tags:
+        - Threads
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 私信线程列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListThreadsResponse'
+    post:
+      summary: 创建私信线程（或获取已有线程）
+      operationId: dmCreateThread
+      tags:
+        - Threads
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateThreadPayload'
+      responses:
+        '200':
+          description: 线程已创建或已存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateThreadResponse'
+        '400':
+          description: 参数错误（如与自己创建线程）
+  /api/v1/dm/threads/{threadId}:
+    get:
+      summary: 获取线程详情
+      operationId: dmGetThreadDetail
+      tags:
+        - Threads
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 线程详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetThreadDetailResponse'
+        '404':
+          description: 线程不存在
+  /api/v1/dm/threads/{threadId}/archive:
+    post:
+      summary: 归档线程
+      operationId: dmArchiveThread
+      tags:
+        - Threads
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 线程已归档
+        '404':
+          description: 线程不存在
+  /api/v1/dm/threads/{threadId}/messages:
+    get:
+      summary: 获取线程消息列表
+      operationId: dmGetMessages
+      tags:
+        - Messages
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: before
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: 获取此时间之前的消息（用于翻页）
+      responses:
+        '200':
+          description: 消息列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetMessagesResponse'
+        '404':
+          description: 线程不存在
+    post:
+      summary: 发送私信消息
+      operationId: dmSendMessage
+      tags:
+        - Messages
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendMessagePayload'
+      responses:
+        '200':
+          description: 消息已发送
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendMessageResponse'
+        '400':
+          description: 内容为空
+        '403':
+          description: 发送者不是线程参与者或安全审查未通过
+        '404':
+          description: 线程不存在
+  /api/v1/dm/threads/{threadId}/read:
+    post:
+      summary: 标记线程消息为已读
+      operationId: dmMarkRead
+      tags:
+        - Messages
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarkReadPayload'
+      responses:
+        '200':
+          description: 已标记
+        '404':
+          description: 线程不存在
+  /api/v1/dm/threads/{threadId}/screening-log:
+    get:
+      summary: 获取线程安全审查日志
+      operationId: dmGetScreeningLog
+      tags:
+        - Screening
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 安全审查日志
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetScreeningLogResponse'
+        '404':
+          description: 线程不存在
+components:
+  securitySchemes:
+    internalToken:
+      type: apiKey
+      in: header
+      name: x-internal-token
+  schemas:
+    DmThread:
+      type: object
+      required:
+        - thread_id
+        - participant_a_id
+        - participant_b_id
+        - created_at
+        - status
+      properties:
+        thread_id:
+          type: string
+          format: uuid
+        participant_a_id:
+          type: string
+          format: uuid
+        participant_b_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        last_message_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_message_preview:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, archived, blocked]
+    DmMessage:
+      type: object
+      required:
+        - message_id
+        - thread_id
+        - sender_user_id
+        - content
+        - created_at
+        - read_by_recipient
+        - message_type
+        - safety_screened
+      properties:
+        message_id:
+          type: string
+          format: uuid
+        thread_id:
+          type: string
+          format: uuid
+        sender_user_id:
+          type: string
+          format: uuid
+        content:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        read_by_recipient:
+          type: boolean
+        message_type:
+          type: string
+          enum: [text, system, safety_notice]
+        safety_screened:
+          type: boolean
+    ListThreadsResponse:
+      type: object
+      required:
+        - threads
+      properties:
+        threads:
+          type: array
+          items:
+            $ref: '#/components/schemas/DmThread'
+    CreateThreadPayload:
+      type: object
+      required:
+        - initiator_user_id
+        - recipient_user_id
+      properties:
+        initiator_user_id:
+          type: string
+          format: uuid
+        recipient_user_id:
+          type: string
+          format: uuid
+    CreateThreadResponse:
+      type: object
+      required:
+        - thread_id
+        - created
+      properties:
+        thread_id:
+          type: string
+          format: uuid
+        created:
+          type: boolean
+    GetThreadDetailResponse:
+      type: object
+      required:
+        - thread_id
+        - participant_a_id
+        - participant_b_id
+        - created_at
+        - status
+        - message_count
+      properties:
+        thread_id:
+          type: string
+          format: uuid
+        participant_a_id:
+          type: string
+          format: uuid
+        participant_b_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        last_message_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_message_preview:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, archived, blocked]
+        message_count:
+          type: integer
+    GetMessagesResponse:
+      type: object
+      required:
+        - thread_id
+        - messages
+      properties:
+        thread_id:
+          type: string
+          format: uuid
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/DmMessage'
+    SendMessagePayload:
+      type: object
+      required:
+        - sender_user_id
+        - content
+      properties:
+        sender_user_id:
+          type: string
+          format: uuid
+        content:
+          type: string
+    SendMessageResponse:
+      type: object
+      required:
+        - message_id
+        - thread_id
+        - created_at
+      properties:
+        message_id:
+          type: string
+          format: uuid
+        thread_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+    MarkReadPayload:
+      type: object
+      required:
+        - reader_user_id
+      properties:
+        reader_user_id:
+          type: string
+          format: uuid
+    SafetyScreeningRecord:
+      type: object
+      required:
+        - screening_id
+        - thread_id
+        - message_id
+        - sender_user_id
+        - verdict
+        - screened_at
+      properties:
+        screening_id:
+          type: string
+          format: uuid
+        thread_id:
+          type: string
+          format: uuid
+        message_id:
+          type: string
+          format: uuid
+        sender_user_id:
+          type: string
+          format: uuid
+        verdict:
+          type: string
+          enum: [allow, flag, reject]
+        screened_at:
+          type: string
+          format: date-time
+    GetScreeningLogResponse:
+      type: object
+      required:
+        - thread_id
+        - screenings
+      properties:
+        thread_id:
+          type: string
+          format: uuid
+        screenings:
+          type: array
+          items:
+            $ref: '#/components/schemas/SafetyScreeningRecord'

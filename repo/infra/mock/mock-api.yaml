@@ -1,0 +1,336 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "OneLink API Mock",
+    "description": "Mock server specification for frontend local development. Covers all BFF aggregation endpoints and downstream service responses.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://localhost:4010", "description": "Prism mock server" }
+  ],
+  "paths": {
+    "/api/v1/bff/chat/init": {
+      "get": {
+        "summary": "Chat init (mock)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Chat init response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MockChatInitResponse" },
+                "example": {
+                  "user": { "user_id": "mock-user-001", "status": "active", "primary_region": "CN", "primary_language": "zh", "timezone": "Asia/Shanghai", "created_at": "2026-05-18T00:00:00Z" },
+                  "conversation": { "conversation_id": "mock-conv-001", "status": "active", "created_at": "2026-05-18T00:00:00Z" },
+                  "pending_questions": [
+                    { "delivery_id": "mock-del-001", "variant_id": "mock-var-001", "question_text": "What are you most interested in right now?", "question_style": "single_choice", "options": ["AI & Tech", "Business", "Creative", "Social Impact"], "requirement_tier": "starter_required" }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/bff/onboarding": {
+      "get": {
+        "summary": "Onboarding (mock)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Onboarding response",
+            "content": {
+              "application/json": {
+                "example": {
+                  "user": { "user_id": "mock-user-001", "status": "active", "primary_region": "CN", "primary_language": "zh" },
+                  "pending_questions": [],
+                  "progress": { "starter_required_count": 3, "starter_required_total": 3, "profile_required_count": 1, "profile_required_total": 2, "optional_count": 0, "can_proceed_to_find": true }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bff/home": {
+      "get": {
+        "summary": "Home (mock)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Home response",
+            "content": {
+              "application/json": {
+                "example": {
+                  "user": { "user_id": "mock-user-001", "status": "active", "primary_region": "CN", "primary_language": "zh" },
+                  "profile": { "user_id": "mock-user-001", "display_name": "Alex", "headline": "AI enthusiast & startup founder", "bio": "Building the future of social connection", "city_level_location": "Shanghai", "languages": ["zh", "en"], "is_searchable": true, "allow_discovery": true },
+                  "completion": { "completion_rate": 0.6, "required_dimensions": ["display_name", "interest_tags", "connection_goals", "current_location", "communication_preferences"], "filled_dimensions": ["display_name", "current_location"], "missing_dimensions": ["interest_tags", "connection_goals", "communication_preferences"] }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bff/profile/{userId}": {
+      "get": {
+        "summary": "Profile (mock)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "userId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": {
+            "description": "Profile response",
+            "content": {
+              "application/json": {
+                "example": {
+                  "user": { "user_id": "mock-user-001", "status": "active" },
+                  "profile": { "user_id": "mock-user-001", "display_name": "Alex", "headline": "AI enthusiast", "facts": [{ "fact_type": "interest", "value": "AI & Tech", "confidence": 0.85, "source_memory_id": "mem-001" }], "traits": { "interest_tags": ["AI & Tech"], "connection_goal_tags": [], "location_label": "Shanghai", "communication_preferences": [] } },
+                  "completion": { "completion_rate": 0.6 }
+                }
+              }
+            }
+          },
+          "403": { "description": "Forbidden" }
+        }
+      }
+    },
+    "/api/v1/identity/register": {
+      "post": {
+        "summary": "Register (mock)",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "required": ["provider", "email", "password", "primary_region", "primary_language"] }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Registration success",
+            "content": {
+              "application/json": {
+                "example": { "user_id": "mock-user-001", "session": { "token": "olk_mock-token-for-dev-only", "expires_at": "2026-06-18T00:00:00Z" } }
+              }
+            }
+          },
+          "409": { "description": "Already registered" }
+        }
+      }
+    },
+    "/api/v1/identity/login": {
+      "post": {
+        "summary": "Login (mock)",
+        "responses": {
+          "200": {
+            "description": "Login success",
+            "content": {
+              "application/json": {
+                "example": { "user_id": "mock-user-001", "session": { "token": "olk_mock-token-for-dev-only", "expires_at": "2026-06-18T00:00:00Z" } }
+              }
+            }
+          },
+          "401": { "description": "Invalid credentials" }
+        }
+      }
+    },
+    "/api/v1/identity/me": {
+      "get": {
+        "summary": "Me (mock)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Current user",
+            "content": {
+              "application/json": {
+                "example": { "user_id": "mock-user-001", "status": "active", "primary_region": "CN", "primary_language": "zh", "timezone": "Asia/Shanghai", "created_at": "2026-05-18T00:00:00Z" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/chat/conversations": {
+      "post": {
+        "summary": "Create/get conversation (mock)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Conversation",
+            "content": {
+              "application/json": {
+                "example": { "conversation_id": "mock-conv-001", "status": "active", "created_at": "2026-05-18T00:00:00Z" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/chat/conversations/{conversationId}/messages": {
+      "post": {
+        "summary": "Send message (mock)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Message sent + AI reply",
+            "content": {
+              "application/json": {
+                "example": { "user_message_id": "mock-msg-001", "ai_message_id": "mock-msg-002", "ai_content_text": "Hi! I'm Lumi, your AI companion. How can I help you connect with the right people today?", "created_at": "2026-05-18T00:00:00Z" }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List messages (mock)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Message list",
+            "content": {
+              "application/json": {
+                "example": { "items": [{ "message_id": "mock-msg-001", "sender_type": "user", "content_text": "Hello!", "content_type": "text", "created_at": "2026-05-18T00:00:00Z" }, { "message_id": "mock-msg-002", "sender_type": "assistant", "content_text": "Hi! I'm Lumi.", "content_type": "text", "created_at": "2026-05-18T00:00:00Z" }], "next_cursor": null }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/profile/me": {
+      "get": {
+        "summary": "Profile me (mock)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Profile",
+            "content": {
+              "application/json": {
+                "example": { "user_id": "mock-user-001", "display_name": "Alex", "avatar_url": "", "headline": "AI enthusiast & startup founder", "bio": "Building the future of social connection", "city_level_location": "Shanghai", "languages": ["zh", "en"], "is_searchable": true, "allow_discovery": true, "updated_at": "2026-05-18T00:00:00Z", "facts": [{ "fact_type": "interest", "value": "AI & Tech", "confidence": 0.85, "source_memory_id": "mem-001" }, { "fact_type": "goal", "value": "希望认识合伙人", "confidence": 0.77, "source_memory_id": "mem-002" }], "traits": { "interest_tags": ["AI & Tech"], "connection_goal_tags": ["希望认识合伙人"], "location_label": "Shanghai", "communication_preferences": [] } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/profile/me/completion": {
+      "get": {
+        "summary": "Profile completion (mock)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Completion",
+            "content": {
+              "application/json": {
+                "example": { "completion_rate": 0.6, "required_dimensions": ["display_name", "interest_tags", "connection_goals", "current_location", "communication_preferences"], "filled_dimensions": ["display_name", "interest_tags", "connection_goals", "current_location"], "missing_dimensions": ["communication_preferences"] }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bff/profile/me": {
+      "patch": {
+        "summary": "Patch profile me (mock)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "properties": { "display_name": { "type": "string" }, "headline": { "type": "string" }, "bio": { "type": "string" }, "city_level_location": { "type": "string" }, "languages": { "type": "array", "items": { "type": "string" } }, "is_searchable": { "type": "boolean" }, "allow_discovery": { "type": "boolean" } } }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Profile updated",
+            "content": {
+              "application/json": {
+                "example": { "user_id": "mock-user-001", "display_name": "Alex", "headline": "AI enthusiast & startup founder", "bio": "Building the future of social connection", "city_level_location": "Shanghai", "languages": ["zh", "en"], "is_searchable": true, "allow_discovery": true, "updated_at": "2026-05-18T00:00:00Z" }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/bff/find/intent": {
+      "post": {
+        "summary": "Find intent (mock)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "required": ["raw_query"], "properties": { "raw_query": { "type": "string" }, "intent_tags": { "type": "array", "items": { "type": "string" } } } }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Find intent accepted",
+            "content": {
+              "application/json": {
+                "example": { "find_request_id": "mock-find-001", "status": "pending" }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/bff/analytics/events": {
+      "post": {
+        "summary": "Analytics events (mock)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "required": ["event_name", "occurred_at", "session_id", "platform", "app_version"], "properties": { "event_name": { "type": "string" }, "occurred_at": { "type": "string", "format": "date-time" }, "session_id": { "type": "string" }, "platform": { "type": "string" }, "app_version": { "type": "string" } } }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Event accepted (fire-and-forget)",
+            "content": {
+              "application/json": {
+                "example": { "accepted": true }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/questions/pending": {
+      "get": {
+        "summary": "Pending questions (mock)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Pending questions",
+            "content": {
+              "application/json": {
+                "example": { "items": [{ "delivery_id": "mock-del-001", "variant_id": "mock-var-001", "question_text": "What are you most interested in right now?", "question_style": "single_choice", "options": ["AI & Tech", "Business", "Creative", "Social Impact"], "requirement_tier": "starter_required" }] }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer" }
+    },
+    "schemas": {
+      "MockChatInitResponse": {
+        "type": "object",
+        "required": ["user", "conversation", "pending_questions"],
+        "properties": {
+          "user": { "type": "object" },
+          "conversation": { "type": "object" },
+          "pending_questions": { "type": "array", "items": { "type": "object" } }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "suite": "L1 vs lexical scaffold (discrimination)",
+  "description": "刻意使用脚本内 lexical 规则未覆盖的查询措辞，或让末条消息不含答案，使 OneLink-L1 仍能命中而对照组失败。",
+  "setup_messages": [
+    "我人在深圳做开发。",
+    "嗯嗯收到。"
+  ],
+  "cases": [
+    {
+      "id": "v21-lex-当前不含现在",
+      "query": "用户当前所在城市是？",
+      "expected_contains": ["深圳"],
+      "expected_candidate_route": "L1",
+      "benchmark_v2_1": {
+        "expect_lexical_full_pass": false,
+        "expect_lexical_latest_pass": false,
+        "rationale": "Lexical-Full 需同时命中「现在」与「哪/城市」槽位；本句用「当前」且不含「现在」。即使后续 scaffold 补入深圳分支，该样本也仍会因未触发「现在」分支而 fail。Lexical-Latest 只看末条，无城市名。"
+      }
+    },
+    {
+      "id": "v21-lex-此刻不含现在",
+      "query": "用户此刻在哪个城市工作？",
+      "expected_contains": ["深圳"],
+      "expected_candidate_route": "L1",
+      "benchmark_v2_1": {
+        "expect_lexical_full_pass": false,
+        "expect_lexical_latest_pass": false,
+        "rationale": "同上：「此刻」不触发脚本内「现在」分支；即使后续 scaffold 补入深圳分支，该样本也仍会因未触发「现在」分支而 fail。末条仍无城市。"
+      }
+    }
+  ]
+}

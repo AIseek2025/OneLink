@@ -1,0 +1,28 @@
+{
+  "suite": "Memory QA",
+  "setup_messages": [
+    "我现在在上海做AI产品",
+    "我不喜欢被推销式沟通",
+    "我对 AI 创业很感兴趣，希望认识投资人和技术合伙人"
+  ],
+  "cases": [
+    {
+      "id": "mq-current-city",
+      "query": "用户现在在哪个城市？",
+      "expected_contains": ["上海"],
+      "expected_candidate_route": "L1"
+    },
+    {
+      "id": "mq-communication-preference",
+      "query": "用户喜欢什么样的沟通方式？",
+      "expected_contains": ["不喜欢被推销式沟通"],
+      "expected_candidate_route": "L1"
+    },
+    {
+      "id": "mq-connection-goal",
+      "query": "用户希望认识谁？",
+      "expected_contains": ["投资人"],
+      "expected_candidate_route": "L1"
+    }
+  ]
+}

@@ -1,0 +1,243 @@
+openapi: 3.0.3
+info:
+  title: OneLink question-service
+  description: |
+    结构化问卷 API（MVP / Phase C 最小纵切）。**默认端口 8086**（与本地 `PORT=8086 cargo run -p question-service` 一致）。
+
+    **职责边界**  
+    - 本服务维护 **问卷投放与答案**（当前为 **in-memory** 种子题，非完整题库/持久化）。  
+    - **不是**画像 owner：答案 **不**直写 `profile-service`；在 `answer_state == "answered"` 且首次写入某 `delivery_id` 时，由本服务 **dev-only HTTP** 向 `context-service` `POST /internal/events/receive` relay **`question.answered.v1`**，后续记忆与投影由 context → profile 既有链路完成。  
+    - **`GET /api/v1/questions/status` 与 `GET /api/v1/questions/completion`** 表示 **问卷侧**进度（starter/profile/optional 计数、`can_proceed_to_find`），与 **`GET /api/v1/profile/me/completion` 的五维结构化完成度无关、不联动**。
+
+    **`question.answered.v1` 与 POST /answers 的对齐（实现最小载荷）**  
+    Relay 的 `payload` 至少包含：`answer_id`、`delivery_id`、`user_id`；Phase C 另含 `variant_id`、`answer_state`、`question_text`、`answer_payload`、`answer_text`、`requirement_tier`、`question_style`（与 `repo/data-platform/event-schemas/question.answered.v1.json` 一致，供 context 侧 `source_type = questionnaire` 记忆抽取）。规范事件 envelope 见 `OneLink/docs/archive/rules-legacy-2026-05-15/Rules/16-MVP-EVENT-SCHEMAS-DRAFT.md` §7.3。
+  version: 0.2.0-draft
+servers:
+  - url: http://127.0.0.1:8086
+    description: 本地默认（question-service，冻结）
+paths:
+  /api/v1/questions/status:
+    get:
+      summary: 问卷题包进度（与 completion 同形）
+      operationId: questionsStatus
+      security:
+        - bearerAuth: []
+      description: |
+        经 `Authorization` 调用 identity `GET /api/v1/identity/me` 解析 `user_id`。  
+        响应对齐进程内种子题：`starter_required_*`、`profile_required_*`、`optional_count`、`can_proceed_to_find`。
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionProgressResponse'
+        '401':
+          description: 未认证或 identity 拒绝
+        '502':
+          description: identity-service 不可用
+  /api/v1/questions/pending:
+    get:
+      summary: 待回答题目列表
+      operationId: questionsPending
+      security:
+        - bearerAuth: []
+      description: |
+        查询参数 `channel`、`limit` 已解析；**当前 MVP** 对 `channel` **不区分**渠道逻辑，仅用于预留。`limit`  clamp 到 [1, 20]。
+      parameters:
+        - name: channel
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 预留（如 `ai_chat`）；当前实现不据此过滤。
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 5
+            minimum: 1
+            maximum: 20
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionPendingResponse'
+        '401':
+          description: 未认证或 identity 拒绝
+        '502':
+          description: identity-service 不可用
+  /api/v1/questions/answers:
+    post:
+      summary: 提交答案
+      operationId: questionsSubmitAnswer
+      security:
+        - bearerAuth: []
+      description: |
+        按 `delivery_id` **幂等**：同一投递重复提交返回 **200** 与已存在记录的 `answer_id` / `answered_at`（不重复 relay）。  
+        `answer_state == "answered"` 时若归一化后答案文本为空则 **400**。  
+        首次成功且 `answer_state == "answered"` 时异步 relay `question.answered.v1`（失败仅打日志，不阻塞 HTTP 200）。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitAnswerRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitAnswerResponse'
+        '400':
+          description: 参数错误、unknown delivery、`variant_id` 不匹配、answered 但空答案等
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '401':
+          description: 未认证或 identity 拒绝
+        '502':
+          description: identity-service 不可用
+  /api/v1/questions/completion:
+    get:
+      summary: 问卷完成度（同 status 形）
+      operationId: questionsCompletion
+      security:
+        - bearerAuth: []
+      description: |
+        **问卷域**进度，**不是** `profile/me/completion`。当前实现与 `GET /questions/status` 返回 **相同 JSON**。
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionProgressResponse'
+        '401':
+          description: 未认证或 identity 拒绝
+        '502':
+          description: identity-service 不可用
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+  schemas:
+    QuestionProgressResponse:
+      type: object
+      required:
+        - starter_required_count
+        - starter_required_total
+        - profile_required_count
+        - profile_required_total
+        - optional_count
+        - can_proceed_to_find
+      properties:
+        starter_required_count:
+          type: integer
+          minimum: 0
+        starter_required_total:
+          type: integer
+          minimum: 0
+        profile_required_count:
+          type: integer
+          minimum: 0
+        profile_required_total:
+          type: integer
+          minimum: 0
+        optional_count:
+          type: integer
+          minimum: 0
+        can_proceed_to_find:
+          type: boolean
+      description: |
+        Phase C 种子题规模随实现而定（非 Rules/15 中占位的大数字）；集成断言勿写死具体 total。
+    QuestionPendingResponse:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PendingQuestionItem'
+    PendingQuestionItem:
+      type: object
+      required:
+        - delivery_id
+        - variant_id
+        - question_text
+        - question_style
+        - options
+        - requirement_tier
+      properties:
+        delivery_id:
+          type: string
+          format: uuid
+        variant_id:
+          type: string
+          description: 稳定种子 id（UUID 形字符串）
+        question_text:
+          type: string
+        question_style:
+          type: string
+          description: 如 `single_choice`、`open_text`
+        options:
+          type: array
+          items: {}
+          description: 选择题选项 JSON 数组；开放题可为 `[]`。
+        requirement_tier:
+          type: string
+          enum:
+            - starter_required
+            - profile_required
+            - optional
+    SubmitAnswerRequest:
+      type: object
+      required:
+        - delivery_id
+        - variant_id
+        - answer_payload
+        - answer_state
+      properties:
+        delivery_id:
+          type: string
+          format: uuid
+        variant_id:
+          type: string
+        answer_payload:
+          description: |
+            实现侧归一化文本优先取 `text`（trim 非空）或 `choice`（trim 非空）；开放题 `answered` 须非空。
+          type: object
+          additionalProperties: true
+        answer_state:
+          type: string
+          description: 实现侧对 relay 仅当 `answered` 处理；其它取值保留兼容。
+        idempotency_key:
+          type: string
+          description: 可选；当前 MVP 未单独使用。
+    SubmitAnswerResponse:
+      type: object
+      required:
+        - answer_id
+        - delivery_id
+        - answered_at
+      properties:
+        answer_id:
+          type: string
+          format: uuid
+        delivery_id:
+          type: string
+          format: uuid
+        answered_at:
+          type: string
+          format: date-time

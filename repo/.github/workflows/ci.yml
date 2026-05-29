@@ -1,0 +1,127 @@
+name: CI Baseline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  ONELINK_ENV: dev
+  RUST_BACKTRACE: 1
+
+jobs:
+  fmt:
+    name: cargo fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all --check
+
+  clippy:
+    name: cargo clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+
+  build-services:
+    name: build service binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build -p identity-service -p profile-service -p context-service -p ai-chat-service -p question-service -p model-gateway -p bff -p api-gateway
+
+  test:
+    name: cargo test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace
+
+  contract:
+    name: contract tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test -p onelink-contract
+
+  security-audit:
+    name: cargo audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rustsec/audit-check@v2
+        with:
+          working-directory: repo
+
+  process-level-smoke:
+    name: process-level smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --workspace
+      - name: identity-service process-level tests
+        run: RUN_PROCESS_LEVEL_SMOKE=1 cargo test -p identity-service --test process_level_runtime -- --test-threads=1
+      - name: context-service process-level tests
+        run: RUN_PROCESS_LEVEL_SMOKE=1 cargo test -p context-service --test process_level_runtime -- --test-threads=1
+      - name: profile-service process-level tests
+        run: RUN_PROCESS_LEVEL_SMOKE=1 cargo test -p profile-service --test process_level_runtime -- --test-threads=1
+
+  ddl-check:
+    name: DDL schema check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify all DDL drafts exist and are non-empty
+        run: cd repo && ./scripts/apply-ddl.sh --check
+
+  persistence-smoke:
+    name: persistence smoke
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: onelink
+          POSTGRES_PASSWORD: onelink_dev_pw
+          POSTGRES_DB: onelink_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: "postgres://onelink:onelink_dev_pw@localhost:5432/onelink_dev"
+      ONELINK_ENV: dev
+      INTERNAL_SHARED_SECRET: "onelink-dev-internal-token"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install psql client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Apply DDL via migration runner
+        run: cd repo && ./scripts/apply-ddl.sh "$DATABASE_URL"
+      - name: Build workspace
+        run: cd repo && cargo build --workspace
+      - name: Run persistence smoke
+        run: cd repo && RUN_PERSISTENCE_SMOKE=1 cargo test -p persistence_smoke -- --test-threads=1

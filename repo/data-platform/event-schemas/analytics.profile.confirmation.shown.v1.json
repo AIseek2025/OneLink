@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "analytics.profile.confirmation.shown.v1",
+  "type": "object",
+  "required": ["event_id", "event_name", "event_version", "occurred_at", "producer", "payload"],
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid" },
+    "event_name": { "type": "string", "const": "analytics.profile.confirmation.shown.v1" },
+    "event_version": { "type": "string" },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "producer": { "type": "string", "const": "web-app" },
+    "trace_id": { "type": "string", "format": "uuid" },
+    "actor_user_id": { "type": "string", "format": "uuid" },
+    "payload": {
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string", "format": "uuid" },
+        "completion_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "missing_dimensions": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["user_id", "completion_rate", "missing_dimensions"],
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

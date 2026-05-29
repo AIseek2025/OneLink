@@ -1,0 +1,12 @@
+# Cursor：本地状态不入库，但版本化团队规则
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
+
+# macOS 本地元数据不应进入规划或工程提交
+.DS_Store
+**/.DS_Store
+
+# OneLink 本地编排/调试痕迹不入库
+.codemaster_orchestration/
+.dbg/

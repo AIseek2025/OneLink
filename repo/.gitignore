@@ -1,0 +1,27 @@
+/target/
+**/*.rs.bk
+**/*.bak
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+.idea/
+.vscode/
+*.swp
+
+# Frontend build artifacts
+apps/web/node_modules/
+apps/web/dist/
+apps/web/dist-temp/
+apps/web/.vite/
+apps/web/*.tsbuildinfo
+
+# React Native local/build artifacts
+apps/mobile/node_modules/
+apps/mobile/android/.gradle/
+apps/mobile/android/app/.cxx/
+apps/mobile/android/app/build/
+apps/mobile/ios/.xcode.env.local
+apps/mobile/ios/Pods/
+apps/mobile/ios/build/

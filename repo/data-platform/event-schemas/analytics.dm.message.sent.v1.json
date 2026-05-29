@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft/2020-12/schema",
+  "$id": "https://onelink.ai/schemas/analytics/dm.message.sent/v1",
+  "title": "AnalyticsDmMessageSentV1",
+  "description": "Backend analytics event emitted when a user sends a DM message. Phase 2 baseline.",
+  "type": "object",
+  "required": ["event_id", "event_name", "event_version", "occurred_at", "producer", "payload", "trace_id"],
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid" },
+    "event_name": { "const": "analytics.dm.message.sent" },
+    "event_version": { "const": "v1" },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "producer": { "type": "string", "const": "bff" },
+    "payload": {
+      "type": "object",
+      "required": ["user_id", "thread_id", "recipient_user_id"],
+      "properties": {
+        "user_id": { "type": "string", "format": "uuid" },
+        "thread_id": { "type": "string" },
+        "recipient_user_id": { "type": "string", "format": "uuid" },
+        "content_type": { "type": "string", "enum": ["text", "image", "voice"] },
+        "safety_reviewed": { "type": "boolean" }
+      }
+    },
+    "trace_id": { "type": "string" },
+    "actor_user_id": { "type": "string", "format": "uuid" }
+  }
+}
