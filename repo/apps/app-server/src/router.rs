@@ -207,7 +207,7 @@ async fn health() -> &'static str {
 }
 
 async fn ready(State(state): State<Arc<AppState>>) -> Result<&'static str, (StatusCode, String)> {
-    let url = format!("{}/api/v1/bff/boot", state.config.bff_base_url);
+    let url = format!("{}/ready", state.config.bff_base_url);
     let resp = state
         .http
         .get(&url)
