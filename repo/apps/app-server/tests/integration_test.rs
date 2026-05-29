@@ -81,6 +81,149 @@ async fn test_boot_no_auth() {
 }
 
 #[tokio::test]
+async fn test_home_with_mock_bff() {
+    let mut mock = mock_bff::MockBff::start().await;
+    mock.set_response("GET", "/api/v1/bff/home", 200, bff_home_response())
+        .await;
+    let app = app_with_bff(&mock.url());
+    let req = Request::builder()
+        .uri("/api/v1/bff/home")
+        .header("Authorization", "Bearer test-token")
+        .body(Body::empty())
+        .unwrap();
+    let resp = app.oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(json["user"]["user_id"], "00000000-0000-0000-0000-000000000001");
+    assert_eq!(json["profile"]["nickname"], "Test");
+    mock.shutdown();
+}
+
+#[tokio::test]
+async fn test_chat_init_with_mock_bff() {
+    let mut mock = mock_bff::MockBff::start().await;
+    mock.set_response(
+        "GET",
+        "/api/v1/bff/chat/init",
+        200,
+        serde_json::json!({
+            "user": { "user_id": "00000000-0000-0000-0000-000000000001" },
+            "conversation": { "conversation_id": "conv-1" },
+            "pending_questions": []
+        }),
+    )
+    .await;
+    let app = app_with_bff(&mock.url());
+    let req = Request::builder()
+        .uri("/api/v1/bff/chat/init")
+        .header("Authorization", "Bearer test-token")
+        .body(Body::empty())
+        .unwrap();
+    let resp = app.oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(json["conversation"]["conversation_id"], "conv-1");
+    mock.shutdown();
+}
+
+#[tokio::test]
+async fn test_onboarding_with_mock_bff() {
+    let mut mock = mock_bff::MockBff::start().await;
+    mock.set_response(
+        "GET",
+        "/api/v1/bff/onboarding",
+        200,
+        serde_json::json!({
+            "user": { "user_id": "00000000-0000-0000-0000-000000000001" },
+            "pending_questions": [],
+            "progress": { "completed": 0, "total": 5 }
+        }),
+    )
+    .await;
+    let app = app_with_bff(&mock.url());
+    let req = Request::builder()
+        .uri("/api/v1/bff/onboarding")
+        .header("Authorization", "Bearer test-token")
+        .body(Body::empty())
+        .unwrap();
+    let resp = app.oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(json["progress"]["total"], 5);
+    mock.shutdown();
+}
+
+#[tokio::test]
+async fn test_profile_patch_with_mock_bff() {
+    let mut mock = mock_bff::MockBff::start().await;
+    mock.set_response(
+        "PATCH",
+        "/api/v1/bff/profile/me",
+        200,
+        serde_json::json!({
+            "ok": true,
+            "display_name": "Updated"
+        }),
+    )
+    .await;
+    let app = app_with_bff(&mock.url());
+    let req = Request::builder()
+        .method("PATCH")
+        .uri("/api/v1/bff/profile/me")
+        .header("Authorization", "Bearer test-token")
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::json!({ "display_name": "Updated" }).to_string(),
+        ))
+        .unwrap();
+    let resp = app.oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(json["ok"], true);
+    mock.shutdown();
+}
+
+#[tokio::test]
+async fn test_question_answers_with_mock_bff() {
+    let mut mock = mock_bff::MockBff::start().await;
+    mock.set_response(
+        "POST",
+        "/api/v1/bff/questions/answers",
+        200,
+        serde_json::json!({
+            "accepted": true,
+            "delivery_id": "delivery-1"
+        }),
+    )
+    .await;
+    let app = app_with_bff(&mock.url());
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/bff/questions/answers")
+        .header("Authorization", "Bearer test-token")
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::json!({
+                "delivery_id": "delivery-1",
+                "variant_id": "variant-1",
+                "answer": "yes"
+            })
+            .to_string(),
+        ))
+        .unwrap();
+    let resp = app.oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(json["accepted"], true);
+    mock.shutdown();
+}
+
+#[tokio::test]
 async fn test_login_with_mock_bff() {
     let mut mock = mock_bff::MockBff::start().await;
     mock.set_response(
@@ -89,10 +232,10 @@ async fn test_login_with_mock_bff() {
         200,
         serde_json::json!({
             "user_id": "00000000-0000-0000-0000-000000000002",
-            "access_token": "login-token",
-            "refresh_token": "login-refresh",
-            "expires_at": "2026-01-01T00:00:00Z",
-            "first_run": false
+            "session": {
+                "token": "login-token",
+                "expires_at": "2026-01-01T00:00:00Z"
+            }
         }),
     )
     .await;
@@ -102,7 +245,12 @@ async fn test_login_with_mock_bff() {
         .uri("/api/v1/bff/auth/login")
         .header("Content-Type", "application/json")
         .body(Body::from(
-            serde_json::json!({"phone": "1234567890", "code": "0000"}).to_string(),
+            serde_json::json!({
+                "provider": "email",
+                "email": "test@example.com",
+                "password": "Secret123!"
+            })
+            .to_string(),
         ))
         .unwrap();
     let resp = app.oneshot(req).await.unwrap();
@@ -110,6 +258,48 @@ async fn test_login_with_mock_bff() {
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
     let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(json["user_id"], "00000000-0000-0000-0000-000000000002");
+    assert_eq!(json["session"]["token"], "login-token");
+    mock.shutdown();
+}
+
+#[tokio::test]
+async fn test_register_with_mock_bff() {
+    let mut mock = mock_bff::MockBff::start().await;
+    mock.set_response(
+        "POST",
+        "/api/v1/bff/auth/register",
+        200,
+        serde_json::json!({
+            "user_id": "00000000-0000-0000-0000-000000000003",
+            "session": {
+                "token": "register-token",
+                "expires_at": "2026-01-01T00:00:00Z"
+            }
+        }),
+    )
+    .await;
+    let app = app_with_bff(&mock.url());
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/bff/auth/register")
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::json!({
+                "provider": "email",
+                "email": "new@example.com",
+                "password": "Secret123!",
+                "primary_region": "CN",
+                "primary_language": "zh"
+            })
+            .to_string(),
+        ))
+        .unwrap();
+    let resp = app.oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(json["user_id"], "00000000-0000-0000-0000-000000000003");
+    assert_eq!(json["session"]["token"], "register-token");
     mock.shutdown();
 }
 
@@ -775,10 +965,10 @@ async fn test_a0_a1_main_chain_e2e() {
         200,
         serde_json::json!({
             "user_id": "00000000-0000-0000-0000-000000000001",
-            "access_token": "e2e-token",
-            "refresh_token": "e2e-refresh",
-            "expires_at": "2026-01-01T00:00:00Z",
-            "first_run": true
+            "session": {
+                "token": "e2e-token",
+                "expires_at": "2026-01-01T00:00:00Z"
+            }
         }),
     )
     .await;
@@ -878,7 +1068,12 @@ async fn test_a0_a1_main_chain_e2e() {
         .uri("/api/v1/bff/auth/login")
         .header("Content-Type", "application/json")
         .body(Body::from(
-            serde_json::json!({"phone": "13800000000", "code": "1234"}).to_string(),
+            serde_json::json!({
+                "provider": "email",
+                "email": "e2e@example.com",
+                "password": "Secret123!"
+            })
+            .to_string(),
         ))
         .unwrap();
     let resp_login = app.clone().oneshot(req_login).await.unwrap();
@@ -889,7 +1084,7 @@ async fn test_a0_a1_main_chain_e2e() {
         login_json["user_id"],
         "00000000-0000-0000-0000-000000000001"
     );
-    assert_eq!(login_json["first_run"], true);
+    assert_eq!(login_json["session"]["token"], "e2e-token");
 
     let req_conv = Request::builder()
         .uri("/api/v1/bff/conversations")

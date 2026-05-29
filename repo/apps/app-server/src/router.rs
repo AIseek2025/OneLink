@@ -55,6 +55,11 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/auth/login", post(auth_login))
         .route("/auth/register", post(auth_register))
         .route("/auth/session/refresh", post(session_refresh))
+        .route("/home", get(home))
+        .route("/chat/init", get(chat_init))
+        .route("/chat/messages", post(chat_messages))
+        .route("/onboarding", get(onboarding))
+        .route("/questions/answers", post(question_answers))
         .route("/me/summary", get(me_summary))
         .route("/conversations", get(conversation_list))
         .route("/conversations/:id/messages", post(chat_send))
@@ -63,7 +68,8 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/profile/confirmations/:id/actions",
             post(profile_confirmation_action),
         )
-        .route("/profile/me", get(profile_me))
+        .route("/profile/me", get(profile_me).patch(profile_me_patch))
+        .route("/profile/:id", get(profile_detail))
         .route("/settings/summary", get(settings_summary))
         .route("/settings/locale", get(locale_get))
         .route("/settings/locale/update", patch(settings_locale_update))
@@ -184,6 +190,38 @@ async fn bff_post(
         .map_err(|e| (StatusCode::BAD_GATEWAY, format!("bff {} json: {e}", path)))
 }
 
+async fn bff_patch(
+    state: &AppState,
+    auth: &str,
+    path: &str,
+    body: &Value,
+    locale: &str,
+) -> Result<Value, (StatusCode, String)> {
+    let url = format!("{}{}", state.config.bff_base_url, path);
+    let resp = state
+        .http
+        .patch(&url)
+        .header(AUTHORIZATION, auth)
+        .header("Content-Type", "application/json")
+        .header("Accept-Language", locale)
+        .json(body)
+        .send()
+        .await
+        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("bff patch {}: {e}", path)))?;
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body_text = resp.text().await.unwrap_or_default();
+        let localized = try_localize_bff_error(&body_text, locale);
+        return Err((
+            status,
+            localized.unwrap_or_else(|| format!("bff {} failed: {body_text}", path)),
+        ));
+    }
+    resp.json()
+        .await
+        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("bff {} json: {e}", path)))
+}
+
 fn try_localize_bff_error(bff_body: &str, locale: &str) -> Option<String> {
     let parsed: serde_json::Value = serde_json::from_str(bff_body).ok()?;
     let message_key = parsed.get("message_key")?.as_str()?;
@@ -251,52 +289,35 @@ async fn boot(
 async fn auth_login(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-    Json(body): Json<AuthRequest>,
-) -> Result<Json<AuthResponse>, (StatusCode, String)> {
+    Json(body): Json<Value>,
+) -> Result<Json<Value>, (StatusCode, String)> {
     let locale = extract_locale(&headers);
     let bff_resp = bff_post(
         &state,
         "",
         "/api/v1/bff/auth/login",
-        &json!({
-            "phone": body.phone,
-            "code": body.code,
-        }),
+        &body,
         locale,
     )
     .await?;
-
-    let resp: AuthResponse = serde_json::from_value(bff_resp)
-        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("login parse: {e}")))?;
-
-    tracing::info!(user_id = %resp.user_id, "app: login success");
-    Ok(Json(resp))
+    Ok(Json(bff_resp))
 }
 
 async fn auth_register(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-    Json(body): Json<RegisterRequest>,
-) -> Result<Json<RegisterResponse>, (StatusCode, String)> {
+    Json(body): Json<Value>,
+) -> Result<Json<Value>, (StatusCode, String)> {
     let locale = extract_locale(&headers);
     let bff_resp = bff_post(
         &state,
         "",
         "/api/v1/bff/auth/register",
-        &json!({
-            "phone": body.phone,
-            "nickname": body.nickname,
-            "avatar_url": body.avatar_url,
-        }),
+        &body,
         locale,
     )
     .await?;
-
-    let resp: RegisterResponse = serde_json::from_value(bff_resp)
-        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("register parse: {e}")))?;
-
-    tracing::info!(user_id = %resp.user_id, "app: register success");
-    Ok(Json(resp))
+    Ok(Json(bff_resp))
 }
 
 async fn session_refresh(
@@ -381,6 +402,58 @@ async fn me_summary(
     };
 
     Ok(Json(resp))
+}
+
+async fn home(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let auth = extract_auth(&headers)?;
+    let locale = extract_locale(&headers);
+    let bff_resp = bff_get(&state, auth, "/api/v1/bff/home", locale).await?;
+    Ok(Json(bff_resp))
+}
+
+async fn chat_init(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let auth = extract_auth(&headers)?;
+    let locale = extract_locale(&headers);
+    let bff_resp = bff_get(&state, auth, "/api/v1/bff/chat/init", locale).await?;
+    Ok(Json(bff_resp))
+}
+
+async fn chat_messages(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<Value>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let auth = extract_auth(&headers)?;
+    let locale = extract_locale(&headers);
+    let bff_resp = bff_post(&state, auth, "/api/v1/bff/chat/messages", &body, locale).await?;
+    Ok(Json(bff_resp))
+}
+
+async fn onboarding(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let auth = extract_auth(&headers)?;
+    let locale = extract_locale(&headers);
+    let bff_resp = bff_get(&state, auth, "/api/v1/bff/onboarding", locale).await?;
+    Ok(Json(bff_resp))
+}
+
+async fn question_answers(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<Value>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let auth = extract_auth(&headers)?;
+    let locale = extract_locale(&headers);
+    let bff_resp = bff_post(&state, auth, "/api/v1/bff/questions/answers", &body, locale).await?;
+    Ok(Json(bff_resp))
 }
 
 async fn conversation_list(
@@ -519,6 +592,29 @@ async fn profile_me(
         .map_err(|e| (StatusCode::BAD_GATEWAY, format!("profile parse: {e}")))?;
 
     Ok(Json(resp))
+}
+
+async fn profile_detail(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::extract::Path(user_id): axum::extract::Path<String>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let auth = extract_auth(&headers)?;
+    let locale = extract_locale(&headers);
+    let path = format!("/api/v1/bff/profile/{user_id}");
+    let bff_resp = bff_get(&state, auth, &path, locale).await?;
+    Ok(Json(bff_resp))
+}
+
+async fn profile_me_patch(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<Value>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let auth = extract_auth(&headers)?;
+    let locale = extract_locale(&headers);
+    let bff_resp = bff_patch(&state, auth, "/api/v1/bff/profile/me", &body, locale).await?;
+    Ok(Json(bff_resp))
 }
 
 async fn settings_summary(

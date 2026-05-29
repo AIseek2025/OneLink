@@ -1,3 +1,5 @@
+import { getStoredToken, getStoredUserId } from '../auth/session';
+
 export type AnalyticsEvent =
   | { event_name: 'page.view'; page_path: string; page_name?: string; referrer?: string }
   | { event_name: 'registration.started'; provider?: string }
@@ -101,7 +103,7 @@ export function setAnalyticsEndpoint(url: string) {
 export async function trackEvent(event: AnalyticsEvent, context: AnalyticsContext): Promise<void> {
   const payload = createAnalyticsEvent(event, context);
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  const token = localStorage.getItem('onelink_token');
+  const token = getStoredToken();
   if (token) { headers['Authorization'] = `Bearer ${token}`; }
   try {
     await fetch(analyticsEndpoint, {
@@ -116,20 +118,8 @@ export async function trackEvent(event: AnalyticsEvent, context: AnalyticsContex
 }
 
 export function getAnalyticsContext(overrides?: Partial<AnalyticsContext>): AnalyticsContext {
-  // JWT decode is for analytics context only — NOT used for auth or access control.
-  // Server-side auth is enforced by BFF/identity-service via Authorization header.
-  // The BFF analytics endpoint overrides user_id from the validated token,
-  // so the client-supplied user_id here is only a fallback hint, not trusted.
-  const token = localStorage.getItem('onelink_token');
-  let userId: string | null = null;
-  if (token) {
-    try {
-      const payload = JSON.parse(atob(token.split('.')[0] || ''));
-      userId = payload?.user_id ?? null;
-    } catch {
-      // ignore
-    }
-  }
+  // user_id is a client-side hint only. The server overwrites it from the validated token.
+  const userId = getStoredUserId();
   return {
     user_id: userId,
     session_id: sessionStorage.getItem('onelink_session_id') || crypto.randomUUID(),

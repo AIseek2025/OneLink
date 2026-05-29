@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { fetchProfile, patchProfile } from '../api/client';
 import { tokens } from '../design-tokens';
 import { trackEvent, getAnalyticsContext } from '../analytics';
+import { getStoredToken, getStoredUserId } from '../auth/session';
 
 interface ProfileData {
   user: { user_id: string; status: string; primary_region: string };
@@ -31,10 +32,9 @@ export function ProfilePage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const token = localStorage.getItem('onelink_token');
+    const token = getStoredToken();
     if (!token) { window.location.href = '/login'; return; }
-    const payload = JSON.parse(atob(token.split('.')[0] || ''));
-    const userId = payload?.user_id || 'me';
+    const userId = getStoredUserId() || 'me';
     fetchProfile(userId)
       .then((d) => {
         setData(d);

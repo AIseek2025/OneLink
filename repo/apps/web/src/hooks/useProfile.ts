@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { fetchProfile, patchProfile } from '../api/client';
 import { trackEvent, getAnalyticsContext } from '../analytics';
+import { getStoredUserId } from '../auth/session';
 
 interface ProfileData {
   user: { user_id: string; status: string; primary_region: string };
@@ -32,15 +33,7 @@ export function useProfile(userId?: string) {
     setIsLoading(true);
     setError(null);
     try {
-      const uid = userId ?? (() => {
-        const token = localStorage.getItem('onelink_token');
-        if (!token) return 'me';
-        try {
-          return JSON.parse(atob(token.split('.')[0] || ''))?.user_id ?? 'me';
-        } catch {
-          return 'me';
-        }
-      })();
+      const uid = userId ?? getStoredUserId() ?? 'me';
       const d = await fetchProfile(uid);
       setData(d);
       const uid2 = d.user?.user_id ?? null;

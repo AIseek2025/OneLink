@@ -1,7 +1,9 @@
+import { extractResponseUserId, getStoredToken, persistSession } from '../auth/session';
+
 const BFF_BASE = '/api/v1/bff';
 
 function getAuthHeader(): Record<string, string> {
-  const token = localStorage.getItem('onelink_token');
+  const token = getStoredToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -12,7 +14,9 @@ export async function register(email: string, password: string, primary_region: 
     body: JSON.stringify({ provider: 'email', email, password, primary_region, primary_language }),
   });
   if (!res.ok) throw new Error(`register failed: ${res.status}`);
-  return res.json();
+  const data = await res.json();
+  persistSession(data?.session?.token, extractResponseUserId(data));
+  return data;
 }
 
 export async function login(email: string, password: string) {
@@ -23,14 +27,16 @@ export async function login(email: string, password: string) {
   });
   if (!res.ok) throw new Error(`login failed: ${res.status}`);
   const data = await res.json();
-  localStorage.setItem('onelink_token', data.session.token);
+  persistSession(data?.session?.token, extractResponseUserId(data));
   return data;
 }
 
 export async function fetchHome() {
   const res = await fetch(`${BFF_BASE}/home`, { headers: getAuthHeader() });
   if (!res.ok) throw new Error(`home failed: ${res.status}`);
-  return res.json();
+  const data = await res.json();
+  persistSession(undefined, extractResponseUserId(data));
+  return data;
 }
 
 export async function fetchChatInit() {
@@ -39,10 +45,13 @@ export async function fetchChatInit() {
   return res.json();
 }
 
-export async function fetchProfile(userId: string) {
-  const res = await fetch(`${BFF_BASE}/profile/${userId}`, { headers: getAuthHeader() });
+export async function fetchProfile(userId?: string) {
+  const path = userId && userId !== 'me' ? `${BFF_BASE}/profile/${userId}` : `${BFF_BASE}/home`;
+  const res = await fetch(path, { headers: getAuthHeader() });
   if (!res.ok) throw new Error(`profile failed: ${res.status}`);
-  return res.json();
+  const data = await res.json();
+  persistSession(undefined, extractResponseUserId(data));
+  return data;
 }
 
 export async function submitFindIntent(rawQuery: string, intentTags?: string[]) {

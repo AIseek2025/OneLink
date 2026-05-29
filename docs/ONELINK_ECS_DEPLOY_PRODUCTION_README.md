@@ -1,5 +1,28 @@
 # OneLink ECS Production Deploy README
 
+## 0. 当前结果
+
+截至当前，`OneLink` 已在共享阿里云 ECS 上完成独立部署并可访问：
+
+- 线上地址：`https://onelink.cool`
+- 登录页：`https://onelink.cool/login`
+- ECS 入口：`admin@8.218.209.218`
+- 本地 SSH 别名：`ssh onelink-ecs`
+- 证书：已完成 Let’s Encrypt 签发并启用 HTTPS
+
+当前已完成的线上验证：
+
+- 注册成功，不再出现 `register failed: 422`
+- 首页成功，不再出现 `home failed: 404`
+- 聊天页成功，不再出现 `chat init failed: 404`
+- 画像页成功，不再出现 `atob` 解码报错
+- 问卷页成功，不再出现 `onboarding failed: 404`
+
+说明：
+
+- 本文档前半部分保留了部署前风险、约束和推荐拓扑，作为上线设计依据
+- 本节与文末“最终实绩”记录的是本轮实际已完成状态
+
 ## 1. 目的
 
 本文档记录 `OneLink` 在共享阿里云 ECS 上的独立部署约束、已核实环境、当前阻塞、推荐拓扑和正式上线步骤。
@@ -303,3 +326,52 @@ cargo run -p onelink-migration-runner -- "$DATABASE_URL"
 5. 完成 ECS 部署、健康检查与主链路 smoke
 
 只有以上步骤完成后，OneLink 才能从当前的 `Blocked No-Go` 进入真正的生产放行判断。
+
+## 12. 本轮实际落地结果
+
+### 12.1 已完成部署
+
+- 已建立 OneLink 独立目录、独立环境文件、独立日志目录
+- 已建立 OneLink 独立 PostgreSQL 容器，监听 `127.0.0.1:5544`
+- 已执行迁移并完成 Rust 服务构建、Web 静态资源发布
+- 已建立 OneLink 独立 Nginx 站点和 HTTPS 证书
+- 已确认 `https://onelink.cool/login` 可访问且页面标题为 `OneLink`
+
+### 12.2 已完成生产修复
+
+- `app-server` readiness 探针修复：
+  - 从错误的 `"{}/api/v1/bff/boot"` 改为正确的 `"{}/ready"`
+- auth 桥接修复：
+  - 登录/注册改为透传当前 Web 使用的 `email/password` 契约
+- Web/BFF/app-server 路由对齐修复：
+  - 补齐 `/home`
+  - 补齐 `/chat/init`
+  - 补齐 `/chat/messages`
+  - 补齐 `/onboarding`
+  - 补齐 `/questions/answers`
+  - 补齐 `/profile/:id`
+  - 补齐 `PATCH /profile/me`
+- Web 会话处理修复：
+  - 不再假设 token 为 JWT
+  - 改为持久化 `onelink_user_id`
+  - 移除 `profile/auth/analytics` 中对 `atob` 的依赖
+
+### 12.3 线上实测结果
+
+- `https://onelink.cool/login#`
+  - 注册成功
+- `https://onelink.cool/`
+  - 首页加载成功
+- `https://onelink.cool/chat`
+  - 聊天页加载成功
+- `https://onelink.cool/profile`
+  - 画像页加载成功
+- `https://onelink.cool/questionnaire`
+  - 问卷页加载成功
+
+### 12.4 共享 ECS 隔离结论
+
+- 本轮仅操作 OneLink 自己的目录、服务、Nginx 配置和证书
+- 未复用其他正式项目服务名、目录或证书路径
+- 未修改其他项目 `server_name`
+- OneLink 的新增运行对象与其他同机项目保持隔离

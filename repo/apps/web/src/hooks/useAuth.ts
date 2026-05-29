@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { login, register } from '../api/client';
 import { trackEvent, getAnalyticsContext } from '../analytics';
+import { clearSession, extractResponseUserId, getStoredToken, getStoredUserId, persistSession } from '../auth/session';
 
 interface AuthState {
   token: string | null;
@@ -11,16 +12,8 @@ interface AuthState {
 
 export function useAuth() {
   const [state, setState] = useState<AuthState>(() => {
-    const token = localStorage.getItem('onelink_token');
-    let userId: string | null = null;
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[0] || ''));
-        userId = payload?.user_id ?? null;
-      } catch {
-        // ignore
-      }
-    }
+    const token = getStoredToken();
+    const userId = getStoredUserId();
     return { token, userId, isLoading: false, error: null };
   });
 
@@ -28,9 +21,9 @@ export function useAuth() {
     setState((s) => ({ ...s, isLoading: true, error: null }));
     try {
       const data = await login(email, password);
-      const userId = data?.user?.user_id ?? null;
+      const userId = extractResponseUserId(data);
       const token = data?.session?.token ?? null;
-      if (token) localStorage.setItem('onelink_token', token);
+      persistSession(token, userId);
       setState({ token, userId, isLoading: false, error: null });
       trackEvent(
         { event_name: 'login_success', user_id: userId ?? '', provider: 'email' },
@@ -52,9 +45,9 @@ export function useAuth() {
     setState((s) => ({ ...s, isLoading: true, error: null }));
     try {
       const data = await register(email, password, region, language);
-      const userId = data?.user?.user_id ?? null;
+      const userId = extractResponseUserId(data);
       const token = data?.session?.token ?? null;
-      if (token) localStorage.setItem('onelink_token', token);
+      persistSession(token, userId);
       setState({ token, userId, isLoading: false, error: null });
       trackEvent(
         { event_name: 'register_success', user_id: userId ?? '', provider: 'email' },
@@ -73,7 +66,7 @@ export function useAuth() {
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem('onelink_token');
+    clearSession();
     setState({ token: null, userId: null, isLoading: false, error: null });
   }, []);
 
